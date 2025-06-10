@@ -30,11 +30,32 @@ const billPaymentFormSchema = z.object({
   billType: z.enum(billTypeValues, { required_error: "Bill type is required" }),
   amount: z.coerce.number({invalid_type_error: "Amount must be a number"}).positive("Amount must be positive"),
   paymentDate: z.string().min(1, "Payment date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
-  proofOfPayment: z.instanceof(FileList).optional()
+  proofOfPayment: z.any() // Base type is any
     .refine(
-        (files) => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, // 5MB limit
-        `Max file size is 5MB.`
-      ).nullable(),
+      (value) => {
+        // If value is null or undefined, it's valid (handled by optional/nullable later)
+        if (value == null) return true;
+
+        // Check if we're in an environment where FileList is defined (browser)
+        if (typeof FileList !== 'undefined') {
+          if (!(value instanceof FileList)) {
+            return false; // If not a FileList on client, invalid
+          }
+          // Now we know value is a FileList
+          if (value.length === 0) return true; // Empty FileList is valid (no file selected)
+          return value[0].size <= 5 * 1024 * 1024; // Check size of the first file (5MB limit)
+        }
+        
+        // If FileList is not defined (server-side) and value is not null/undefined,
+        // this is an unexpected state for a file input. Consider it invalid.
+        return false;
+      },
+      {
+        message: 'Proof of payment must be a valid file (max 5MB) or not provided.',
+      }
+    )
+    .optional() // Makes the field itself optional (can be omitted)
+    .nullable(), // Allows the field to be explicitly null
   notes: z.string().optional(),
 });
 
@@ -57,7 +78,7 @@ function BillPaymentForm() {
   });
 
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
-    console.log("Form submitted successfully with data:", data); // Log successful submission
+    console.log("Form submitted successfully with data:", data);
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -90,7 +111,7 @@ function BillPaymentForm() {
         <CardDescription>Submit proof of payment or log a new bill for a tenant.</CardDescription>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}> {/* Updated handleSubmit */}
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
