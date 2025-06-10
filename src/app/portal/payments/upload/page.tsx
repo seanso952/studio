@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, type SubmitHandler, type FieldErrors } from 'react-hook-form';
+import { useForm, type SubmitHandler, type SubmitErrorHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export default function TenantPaymentUploadPage() {
     setIsLoading(false);
   };
 
-  const onInvalidSubmit = (errors: FieldErrors<PaymentUploadFormValues>) => {
+  const onInvalidSubmit: SubmitErrorHandler<PaymentUploadFormValues> = (errors) => {
     console.error("Tenant Payment Upload Validation Errors:", errors);
     toast({
         variant: "destructive",
@@ -85,7 +85,11 @@ export default function TenantPaymentUploadPage() {
     return (
          <div className="space-y-6">
             <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
-            <Card><CardContent className="p-6 text-center text-muted-foreground">Could not load tenant information. Please try again.</CardContent></Card>
+            <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                    Could not load tenant information. Please try again.
+                </CardContent>
+            </Card>
         </div>
     );
   }
