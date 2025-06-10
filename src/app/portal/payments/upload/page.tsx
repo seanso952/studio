@@ -83,14 +83,10 @@ export default function TenantPaymentUploadPage() {
 
   if (!tenant) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Could not load tenant information. Please try again.
-          </CardContent>
-        </Card>
-      </div>
+         <div className="space-y-6">
+            <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
+            <Card><CardContent className="p-6 text-center text-muted-foreground">Could not load tenant information. Please try again.</CardContent></Card>
+        </div>
     );
   }
 
