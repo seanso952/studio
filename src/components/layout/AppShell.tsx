@@ -43,7 +43,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
   { href: '/tenants', label: 'Tenants', icon: Users },
   { href: '/payments', label: 'Payments & Bills', icon: CreditCard },
@@ -119,9 +119,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/logout">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

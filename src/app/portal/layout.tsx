@@ -38,9 +38,11 @@ export default function PortalLayout({
           </nav>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-muted-foreground hidden sm:inline">Welcome, {tenantName}!</span>
-            <Button variant="outline" size="sm">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout (Simulated)
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/logout">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Link>
             </Button>
           </div>
         </div>
