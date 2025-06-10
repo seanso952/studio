@@ -15,7 +15,7 @@ import { getUnitsByBuildingId, subscribeToUnits, unassignTenantFromUnit as unass
 import { updateTenantInStore, getTenantById } from '@/lib/tenantStore';
 import { mockRepairs } from '@/lib/mockData'; 
 import type { Unit, Tenant, Repair } from '@/lib/types';
-import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle, UserPlus, Edit, FileCog, LogOut } from 'lucide-react';
+import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle, UserPlus, Edit, FileCog, LogOut, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
 
 export default function UnitDetailsPage() {
   const params = useParams();
@@ -37,12 +38,17 @@ export default function UnitDetailsPage() {
   const unitId = params.unitId as string;
   const { toast } = useToast();
 
+  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
   const [unit, setUnit] = React.useState<Unit | undefined>(undefined);
   
-  const allBuildings = getBuildings();
+  const allBuildings = getBuildings(); // Static, consider subscription if buildings change
   const building = allBuildings.find(b => b.id === buildingId);
   
   React.useEffect(() => {
+    const updateUserAuth = () => setCurrentUserLocal(getCurrentUser());
+    updateUserAuth();
+    const unsubscribeAuth = subscribeToUserChanges(updateUserAuth);
+
     if (!buildingId || !unitId) return;
 
     const updateUnit = () => {
@@ -52,14 +58,18 @@ export default function UnitDetailsPage() {
     };
 
     updateUnit(); 
-
-    const unsubscribe = subscribeToUnits(updateUnit); 
-    return () => unsubscribe();
+    const unsubscribeUnits = subscribeToUnits(updateUnit); 
+    
+    return () => {
+      unsubscribeAuth();
+      unsubscribeUnits();
+    };
   }, [buildingId, unitId]);
 
   const tenant = unit?.tenant;
   const repairsForUnit = unit ? (unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId)) : [];
 
+  const canViewUnit = currentUser.role === 'admin' || (currentUser.role === 'manager' && currentUser.assignedBuildingIds?.includes(buildingId));
 
   if (!building) { 
     return (
@@ -74,7 +84,7 @@ export default function UnitDetailsPage() {
     );
   }
   
-  if (!unit) {
+  if (!unit && canViewBuilding) { // Check canViewBuilding before showing unit not found for this building
      return (
       <div className="text-center py-10">
         <h2 className="text-2xl font-semibold">Unit not found</h2>
@@ -86,6 +96,22 @@ export default function UnitDetailsPage() {
       </div>
     );
   }
+
+  if (!canViewUnit) {
+    return (
+     <div className="text-center py-10">
+       <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+       <h2 className="text-2xl font-semibold text-destructive">Access Denied</h2>
+       <p className="text-muted-foreground">You do not have permission to view this unit.</p>
+       <Button asChild variant="link" className="mt-4">
+         <Link href={`/properties`}> {/* Or /properties/${buildingId} if they could see the building but not unit */}
+           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Properties
+         </Link>
+       </Button>
+     </div>
+   );
+ }
+
 
   const handleLogRepair = () => {
     router.push(`/properties/${buildingId}/${unitId}/log-repair`);
@@ -119,10 +145,7 @@ export default function UnitDetailsPage() {
     const tenantToUnassignId = unit.tenant.id;
 
     try {
-      // 1. Update unit in unitStore
       unassignTenantFromUnitInStore(unit.id);
-
-      // 2. Update tenant in tenantStore
       const currentTenant = getTenantById(tenantToUnassignId);
       if (currentTenant) {
         updateTenantInStore({
@@ -132,12 +155,10 @@ export default function UnitDetailsPage() {
           buildingName: '',
         });
       }
-      
       toast({
         title: "Tenant Unassigned",
         description: `Tenant has been unassigned and Unit ${unit.unitNumber} is now marked as vacant.`,
       });
-      // The component will re-render due to store subscriptions
     } catch (error) {
       console.error("Failed to unassign tenant:", error);
       toast({
@@ -251,7 +272,6 @@ export default function UnitDetailsPage() {
                     </CardHeader>
                     <CardContent>
                       <p className="text-muted-foreground">Unit-specific documents (e.g., inspection reports, floor plans) will be listed here.</p>
-                      {/* Placeholder for documents list */}
                     </CardContent>
                   </Card>
                 </TabsContent>

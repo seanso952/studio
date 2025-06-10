@@ -1,12 +1,15 @@
 
 'use client';
 
+import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { mockBuildings, mockTenants, mockBillPayments, mockBouncedChecks } from "@/lib/mockData";
-import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock, UploadCloud } from "lucide-react";
+import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock, UploadCloud, Briefcase } from "lucide-react";
 import Image from "next/image";
+import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 interface StatCardProps {
   title: string;
@@ -40,18 +43,46 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, descripti
 
 
 export default function DashboardPage() {
-  const totalProperties = mockBuildings.length;
-  const totalTenants = mockTenants.length;
-  const upcomingRenewals = mockTenants.filter(t => {
+  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
+
+  React.useEffect(() => {
+    const updateUser = () => setCurrentUserLocal(getCurrentUser());
+    updateUser();
+    const unsubscribe = subscribeToUserChanges(updateUser);
+    return () => unsubscribe();
+  }, []);
+
+  const buildingsToDisplay = currentUser.role === 'manager' 
+    ? mockBuildings.filter(b => currentUser.assignedBuildingIds?.includes(b.id)) 
+    : mockBuildings;
+
+  const tenantsToDisplay = currentUser.role === 'manager'
+    ? mockTenants.filter(t => buildingsToDisplay.some(b => b.name === t.buildingName))
+    : mockTenants;
+
+  const totalProperties = buildingsToDisplay.length;
+  const totalTenants = tenantsToDisplay.length;
+  
+  const upcomingRenewals = tenantsToDisplay.filter(t => {
     const endDate = new Date(t.contractEndDate);
     const today = new Date();
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(today.getMonth() + 3);
     return endDate > today && endDate <= threeMonthsFromNow;
   }).length;
-  const pendingPayments = mockBillPayments.filter(p => p.status === 'pending').length;
-  const bouncedChecksCount = mockBouncedChecks.length;
-  const totalIncome = mockBuildings.reduce((sum, building) => sum + (building.totalIncome || 0), 0);
+
+  const paymentsToConsider = currentUser.role === 'manager'
+    ? mockBillPayments.filter(p => buildingsToDisplay.some(b => b.name === p.buildingName))
+    : mockBillPayments;
+  
+  const pendingPayments = paymentsToConsider.filter(p => p.status === 'pending').length;
+  
+  const bouncedChecksToConsider = currentUser.role === 'manager'
+    ? mockBouncedChecks.filter(bc => buildingsToDisplay.some(b => b.name === bc.buildingName))
+    : mockBouncedChecks;
+  const bouncedChecksCount = bouncedChecksToConsider.length;
+
+  const totalIncome = buildingsToDisplay.reduce((sum, building) => sum + (building.totalIncome || 0), 0);
 
   const recentActivities = [
     { type: "New Tenant", description: "John Doe moved into Unit 3B, Downtown Lofts", time: "2 hours ago" },
@@ -62,14 +93,22 @@ export default function DashboardPage() {
   const criticalAlerts = [
     { id: "alert1", message: "Contract for Unit 1B (Charlie Brown) expiring in 2 weeks.", severity: "high" },
     { id: "alert2", message: "Bounced check from Bob The Builder needs follow-up.", severity: "medium" },
-  ];
+  ].filter(alert => { // Basic filter, could be more sophisticated
+    if (currentUser.role === 'manager') {
+      return alert.message.includes("Unit 1B") && currentUser.assignedBuildingIds?.includes('building1'); // Example
+    }
+    return true;
+  });
+
+  const pageTitle = currentUser.role === 'manager' ? "Manager Dashboard" : "Admin Dashboard";
+  const pageDescription = currentUser.role === 'manager' ? `Welcome, ${currentUser.name}! Overview of your assigned properties.` : "Welcome to EstateMind Admin Panel";
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-headline font-semibold text-foreground">Welcome to EstateMind</h1>
+      <PageHeader title={pageTitle} description={pageDescription} />
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Properties" value={totalProperties} icon={Building2} link="/properties" linkLabel="View Properties" />
+        <StatCard title="Total Properties" value={totalProperties} icon={currentUser.role === 'manager' ? Briefcase : Building2} link="/properties" linkLabel="View Properties" />
         <StatCard title="Total Tenants" value={totalTenants} icon={Users} link="/tenants" linkLabel="Manage Tenants" />
         <StatCard title="Monthly Income" value={`$${totalIncome.toLocaleString()}`} icon={DollarSign} description="Estimated current monthly rent" color="text-green-600" />
         <StatCard title="Upcoming Renewals" value={upcomingRenewals} icon={CalendarClock} description="Contracts expiring in next 3 months" link="/tenants" linkLabel="View Contracts" color="text-orange-500" />
@@ -97,7 +136,7 @@ export default function DashboardPage() {
             <CardDescription>Your most recently managed properties.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockBuildings.slice(0, 3).map(building => (
+            {buildingsToDisplay.slice(0, 3).map(building => (
               <Link href={`/properties/${building.id}`} key={building.id} className="block hover:bg-muted/50 p-3 rounded-md transition-colors">
                 <div className="flex items-center gap-3">
                   <Image src={building.imageUrl || "https://placehold.co/80x80.png"} alt={building.name} width={60} height={60} className="rounded-md" data-ai-hint="building exterior" />
@@ -108,6 +147,7 @@ export default function DashboardPage() {
                 </div>
               </Link>
             ))}
+             {buildingsToDisplay.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No properties assigned or found.</p>}
           </CardContent>
         </Card>
       </div>

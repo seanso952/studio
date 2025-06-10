@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getBuildings } from '@/lib/propertyStore';
-import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; // Import unit store functions
+import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; 
 import type { Building, Unit } from '@/lib/types';
-import { ArrowLeft, PlusCircle, Home, Users, BedDouble, Bath, DollarSign, Wrench } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Home, Users, BedDouble, Bath, DollarSign, Wrench, AlertTriangle } from 'lucide-react';
+import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
+import { useToast } from '@/hooks/use-toast';
+
 
 function UnitCard({ unit, buildingName }: { unit: Unit; buildingName: string }) {
   return (
@@ -40,9 +43,12 @@ function UnitCard({ unit, buildingName }: { unit: Unit; buildingName: string }) 
 
 export default function BuildingDetailsPage() {
   const params = useParams();
+  const router = useRouter();
+  const { toast } = useToast();
   const buildingId = params.buildingId as string;
   
-  const allBuildings = getBuildings();
+  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
+  const allBuildings = getBuildings(); // This is static, consider subscribing if buildings can change
   const building = allBuildings.find(b => b.id === buildingId);
   
   const [unitsInBuilding, setUnitsInBuilding] = React.useState<Unit[]>(() => 
@@ -50,18 +56,24 @@ export default function BuildingDetailsPage() {
   );
 
   React.useEffect(() => {
-    if (!buildingId) return;
+    const updateUserAuth = () => setCurrentUserLocal(getCurrentUser());
+    updateUserAuth();
+    const unsubscribeAuth = subscribeToUserChanges(updateUserAuth);
 
+    if (!buildingId) return;
     const updateUnits = () => {
       setUnitsInBuilding(getUnitsByBuildingId(buildingId));
     };
+    updateUnits(); 
+    const unsubscribeUnits = subscribeToUnits(updateUnits);
     
-    updateUnits(); // Initial fetch
-
-    const unsubscribe = subscribeToUnits(updateUnits);
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      unsubscribeUnits();
+    };
   }, [buildingId]);
 
+  const canViewBuilding = currentUser.role === 'admin' || (currentUser.role === 'manager' && currentUser.assignedBuildingIds?.includes(buildingId));
 
   if (!building) {
     return (
@@ -75,6 +87,22 @@ export default function BuildingDetailsPage() {
       </div>
     );
   }
+  
+  if (!canViewBuilding) {
+     return (
+      <div className="text-center py-10">
+        <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-2xl font-semibold text-destructive">Access Denied</h2>
+        <p className="text-muted-foreground">You do not have permission to view this property.</p>
+        <Button asChild variant="link" className="mt-4">
+          <Link href="/properties">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to My Properties
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
 
   const totalRent = unitsInBuilding.reduce((sum, unit) => unit.status === 'occupied' ? sum + unit.monthlyRent : sum, 0);
   const occupancyRate = unitsInBuilding.length > 0 ? (unitsInBuilding.filter(u => u.status === 'occupied').length / unitsInBuilding.length) * 100 : 0;
@@ -102,7 +130,7 @@ export default function BuildingDetailsPage() {
           <div className="grid md:grid-cols-3 gap-6 mb-6">
             <div className="p-4 bg-muted rounded-lg">
               <h3 className="text-sm font-medium text-muted-foreground">Total Units</h3>
-              <p className="text-2xl font-semibold font-headline">{unitsInBuilding.length}</p> {/* Changed from building.numberOfUnits */}
+              <p className="text-2xl font-semibold font-headline">{unitsInBuilding.length}</p>
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <h3 className="text-sm font-medium text-muted-foreground">Occupancy</h3>
@@ -146,7 +174,6 @@ export default function BuildingDetailsPage() {
                 <CardHeader><CardTitle className="font-headline">Financial Overview</CardTitle></CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">Detailed financial information for {building.name} will be displayed here, including income, expenses, and profitability.</p>
-                  {/* Placeholder for financial charts/tables */}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -155,7 +182,6 @@ export default function BuildingDetailsPage() {
                 <CardHeader><CardTitle className="font-headline">Maintenance Log</CardTitle></CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">A log of all maintenance activities and repairs for units within {building.name}.</p>
-                   {/* Placeholder for maintenance logs */}
                 </CardContent>
               </Card>
             </TabsContent>

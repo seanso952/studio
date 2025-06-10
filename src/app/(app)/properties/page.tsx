@@ -7,9 +7,10 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { getBuildings, subscribeToBuildings } from '@/lib/propertyStore'; // Import store functions
+import { getBuildings, subscribeToBuildings } from '@/lib/propertyStore'; 
 import type { Building } from '@/lib/types';
 import { PlusCircle, MapPin, Users, Home } from 'lucide-react';
+import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
 
 function PropertyCard({ building }: { building: Building }) {
   return (
@@ -52,50 +53,62 @@ function PropertyCard({ building }: { building: Building }) {
 }
 
 export default function PropertiesPage() {
-  // Initialize state with a function to get initial buildings only once
-  const [buildings, setBuildings] = React.useState<Building[]>(() => getBuildings());
+  const [allBuildings, setAllBuildings] = React.useState<Building[]>(() => getBuildings());
+  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
 
   React.useEffect(() => {
-    const unsubscribe = subscribeToBuildings(() => {
-      setBuildings(getBuildings()); // Update state when store changes
-    });
+    const updateUser = () => setCurrentUserLocal(getCurrentUser());
+    updateUser();
+    const unsubscribeUser = subscribeToUserChanges(updateUser);
     
-    // It's good practice to also fetch the latest state right after subscribing,
-    // in case the store was updated between the initial useState and the effect running.
-    // However, this might be redundant if subscribeToBuildings immediately calls back
-    // or if the initial useState(() => getBuildings()) is sufficient.
-    // For robustness in case of timing issues:
-    setBuildings(getBuildings());
+    const updateBuildings = () => setAllBuildings(getBuildings());
+    updateBuildings();
+    const unsubscribeBuildings = subscribeToBuildings(updateBuildings);
+    
+    return () => {
+      unsubscribeUser();
+      unsubscribeBuildings();
+    };
+  }, []);
 
-
-    return () => unsubscribe(); // Cleanup subscription on component unmount
-  }, []); // Empty dependency array ensures this runs once on mount
+  const buildingsToDisplay = currentUser.role === 'manager'
+    ? allBuildings.filter(b => currentUser.assignedBuildingIds?.includes(b.id))
+    : allBuildings;
+  
+  const pageTitle = currentUser.role === 'manager' ? "My Assigned Properties" : "All Properties";
+  const pageDescription = currentUser.role === 'manager' ? "Manage properties assigned to you." : "Manage all your real estate properties.";
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Properties" description="Manage all your real estate properties.">
-        <Button asChild>
-          <Link href="/properties/add">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
-          </Link>
-        </Button>
+      <PageHeader title={pageTitle} description={pageDescription}>
+        {currentUser.role === 'admin' && ( // Only admin can add new properties
+          <Button asChild>
+            <Link href="/properties/add">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
+            </Link>
+          </Button>
+        )}
       </PageHeader>
 
-      {buildings.length > 0 ? (
+      {buildingsToDisplay.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {buildings.map((building) => (
+          {buildingsToDisplay.map((building) => (
             <PropertyCard key={building.id} building={building} />
           ))}
         </div>
       ) : (
         <Card>
           <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">No properties found. Add your first property to get started.</p>
-            <Button asChild className="mt-4">
-              <Link href="/properties/add">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
-              </Link>
-            </Button>
+            <p className="text-muted-foreground">
+              {currentUser.role === 'manager' ? "No properties are currently assigned to you." : "No properties found. Add your first property to get started."}
+            </p>
+            {currentUser.role === 'admin' && (
+              <Button asChild className="mt-4">
+                <Link href="/properties/add">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

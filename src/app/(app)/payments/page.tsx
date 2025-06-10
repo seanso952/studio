@@ -17,11 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { mockBillPayments, mockBouncedChecks as initialMockBouncedChecks, mockTenants } from '@/lib/mockData';
+import { mockBillPayments, mockBouncedChecks as initialMockBouncedChecks, mockTenants, mockBuildings } from '@/lib/mockData';
 import type { BillPayment, BouncedCheck, BillType } from '@/lib/types';
 import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
 
 const billTypeValues = ['rent', 'electricity', 'water', 'association_dues', 'other'] as const;
 
@@ -52,9 +53,10 @@ type BillPaymentFormValues = z.infer<typeof billPaymentFormSchema>;
 
 interface BillPaymentFormProps {
   onPaymentLogged: (newPayment: BillPayment) => void;
+  currentUser: MockAuthUser;
 }
 
-function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
+function BillPaymentForm({ onPaymentLogged, currentUser }: BillPaymentFormProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
@@ -69,9 +71,12 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
       notes: '',
     },
   });
+  
+  const tenantsForSelection = currentUser.role === 'manager'
+    ? mockTenants.filter(t => currentUser.assignedBuildingIds?.some(bid => mockBuildings.find(b => b.id === bid)?.name === t.buildingName))
+    : mockTenants;
 
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
-    console.log("Form submitted successfully with data:", data);
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -96,7 +101,6 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
     };
 
     onPaymentLogged(newBillEntry);
-
     toast({
         title: "Submission Successful",
         description: "Bill/payment has been logged and is pending approval."
@@ -106,12 +110,10 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
   };
 
   const onInvalidSubmit: SubmitErrorHandler<BillPaymentFormValues> = (errors) => {
-    console.error("Form validation failed:", errors);
-    const errorMessages = Object.values(errors).map(e => e.message).filter(Boolean).join(' ');
     toast({
       variant: "destructive",
       title: "Validation Error",
-      description: `Please check the form for errors. ${errorMessages || 'See console for details.'}`,
+      description: `Please check the form for errors. ${Object.values(errors).map(e=>e.message).join(' ')}`,
     });
   };
 
@@ -136,7 +138,7 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
                         <SelectTrigger id="tenantSelect"><SelectValue placeholder="Select Tenant" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
+                        {tenantsForSelection.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -255,9 +257,10 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
 interface ApprovalQueueTableProps {
   payments: BillPayment[];
   onUpdatePaymentStatus: (paymentId: string, status: 'approved' | 'rejected', notes?: string) => void;
+  canApprove: boolean;
 }
 
-function ApprovalQueueTable({ payments, onUpdatePaymentStatus }: ApprovalQueueTableProps) {
+function ApprovalQueueTable({ payments, onUpdatePaymentStatus, canApprove }: ApprovalQueueTableProps) {
   const { toast } = useToast();
   const pendingApproval = payments.filter(p => p.status === 'pending');
 
@@ -300,8 +303,13 @@ function ApprovalQueueTable({ payments, onUpdatePaymentStatus }: ApprovalQueueTa
                   <TableCell>{format(new Date(payment.dueDate), 'MMM d, yyyy')}</TableCell>
                   <TableCell className="text-right space-x-2">
                     {payment.proofOfPaymentUrl && <Button variant="outline" size="sm" asChild><a href={payment.proofOfPaymentUrl} target="_blank" rel="noopener noreferrer">View Proof</a></Button>}
-                    <Button onClick={() => handleApprove(payment.id)} variant="ghost" size="icon" className="text-green-600 hover:text-green-700"><CheckCircle className="h-5 w-5" /></Button>
-                    <Button onClick={() => handleReject(payment.id)} variant="ghost" size="icon" className="text-red-600 hover:text-red-700"><XCircle className="h-5 w-5" /></Button>
+                    {canApprove && (
+                      <>
+                        <Button onClick={() => handleApprove(payment.id)} variant="ghost" size="icon" className="text-green-600 hover:text-green-700"><CheckCircle className="h-5 w-5" /></Button>
+                        <Button onClick={() => handleReject(payment.id)} variant="ghost" size="icon" className="text-red-600 hover:text-red-700"><XCircle className="h-5 w-5" /></Button>
+                      </>
+                    )}
+                    {!canApprove && <Badge variant="outline">Admin Approval Req.</Badge>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -386,9 +394,10 @@ type BouncedCheckFormValues = z.infer<typeof bouncedCheckFormSchema>;
 
 interface BouncedCheckFormProps {
   onBouncedCheckLogged: (newCheck: BouncedCheck) => void;
+  currentUser: MockAuthUser;
 }
 
-function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
+function BouncedCheckForm({ onBouncedCheckLogged, currentUser }: BouncedCheckFormProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
@@ -405,6 +414,10 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
       notes: '',
     },
   });
+
+  const tenantsForSelection = currentUser.role === 'manager'
+    ? mockTenants.filter(t => currentUser.assignedBuildingIds?.some(bid => mockBuildings.find(b => b.id === bid)?.name === t.buildingName))
+    : mockTenants;
 
   const onSubmit: SubmitHandler<BouncedCheckFormValues> = async (data) => {
     setIsLoading(true);
@@ -446,7 +459,7 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
                       <SelectTrigger><SelectValue placeholder="Select Tenant" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
+                      {tenantsForSelection.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -561,16 +574,20 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
   );
 }
 
-
 interface BouncedChecksTableProps {
   checks: BouncedCheck[];
   onUpdateStatus: (checkId: string, newStatus: BouncedCheck['status']) => void;
+  canUpdateStatus: boolean; // For manager role
 }
 
-function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps) {
+function BouncedChecksTable({ checks, onUpdateStatus, canUpdateStatus }: BouncedChecksTableProps) {
   const { toast } = useToast();
 
   const handleUpdateBouncedCheckStatus = (checkId: string) => {
+    if (!canUpdateStatus) {
+        toast({variant: "destructive", title: "Permission Denied", description: "You do not have permission to update bounced check status."});
+        return;
+    }
     const currentCheck = checks.find(c => c.id === checkId);
     if (!currentCheck) return;
     const currentIndex = bouncedCheckStatusValues.indexOf(currentCheck.status);
@@ -621,7 +638,7 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button onClick={() => handleUpdateBouncedCheckStatus(check.id)} variant="outline" size="sm">Update Status</Button>
+                    <Button onClick={() => handleUpdateBouncedCheckStatus(check.id)} variant="outline" size="sm" disabled={!canUpdateStatus}>Update Status</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -638,8 +655,29 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
 function PaymentsPageContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
+  
+  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
+  React.useEffect(() => {
+    const updateUser = () => setCurrentUserLocal(getCurrentUser());
+    updateUser();
+    const unsubscribe = subscribeToUserChanges(updateUser);
+    return () => unsubscribe();
+  }, []);
+
   const [dynamicBillPayments, setDynamicBillPayments] = React.useState<BillPayment[]>(mockBillPayments);
   const [dynamicBouncedChecks, setDynamicBouncedChecks] = React.useState<BouncedCheck[]>(initialMockBouncedChecks);
+
+  const canApprovePayments = currentUser.role === 'admin';
+  const canUpdateBouncedCheckStatus = currentUser.role === 'admin'; // Or specific manager permission later
+
+  const paymentsToDisplay = currentUser.role === 'manager'
+    ? dynamicBillPayments.filter(p => currentUser.assignedBuildingIds?.some(bid => mockBuildings.find(b => b.id === bid)?.name === p.buildingName))
+    : dynamicBillPayments;
+
+  const bouncedChecksToDisplay = currentUser.role === 'manager'
+    ? dynamicBouncedChecks.filter(bc => currentUser.assignedBuildingIds?.some(bid => mockBuildings.find(b => b.id === bid)?.name === bc.buildingName))
+    : dynamicBouncedChecks;
+
 
   const handlePaymentLogged = (newPayment: BillPayment) => {
     setDynamicBillPayments(prevPayments => [newPayment, ...prevPayments]);
@@ -687,19 +725,19 @@ function PaymentsPageContent() {
         </TabsList>
 
         <TabsContent value="overview">
-          <BillPaymentForm onPaymentLogged={handlePaymentLogged} />
+          <BillPaymentForm onPaymentLogged={handlePaymentLogged} currentUser={currentUser} />
         </TabsContent>
         <TabsContent value="approval">
-          <ApprovalQueueTable payments={dynamicBillPayments} onUpdatePaymentStatus={handleUpdatePaymentStatus} />
+          <ApprovalQueueTable payments={paymentsToDisplay} onUpdatePaymentStatus={handleUpdatePaymentStatus} canApprove={canApprovePayments} />
         </TabsContent>
          <TabsContent value="all_payments">
-          <AllPaymentsTable payments={dynamicBillPayments} />
+          <AllPaymentsTable payments={paymentsToDisplay} />
         </TabsContent>
         <TabsContent value="bounced">
-          <BouncedChecksTable checks={dynamicBouncedChecks} onUpdateStatus={handleUpdateBouncedCheckStatus} />
+          <BouncedChecksTable checks={bouncedChecksToDisplay} onUpdateStatus={handleUpdateBouncedCheckStatus} canUpdateStatus={canUpdateBouncedCheckStatus} />
         </TabsContent>
         <TabsContent value="log_bounced_check">
-          <BouncedCheckForm onBouncedCheckLogged={handleBouncedCheckLogged} />
+          <BouncedCheckForm onBouncedCheckLogged={handleBouncedCheckLogged} currentUser={currentUser}/>
         </TabsContent>
       </Tabs>
     </div>
