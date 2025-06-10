@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
-import { mockTenants, mockBillPayments } from '@/lib/mockData'; 
+import { mockTenants, mockBillPayments } from '@/lib/mockData';
 import type { BillPayment } from '@/lib/types';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -24,7 +24,7 @@ const paymentUploadFormSchema = z.object({
   paymentDate: z.string().min(1, "Payment date is required.").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   proofOfPayment: z.any()
     .refine(
-      (value) => typeof window === 'undefined' || (value instanceof FileList && value.length > 0), 
+      (value) => typeof window === 'undefined' || (value instanceof FileList && value.length > 0),
       "Proof of payment (file) is required."
     )
     .refine(
@@ -39,9 +39,9 @@ type PaymentUploadFormValues = z.infer<typeof paymentUploadFormSchema>;
 export default function TenantPaymentUploadPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-  
-  const tenant = mockTenants[0]; 
-  const tenantUnpaidBills = tenant 
+
+  const tenant = mockTenants[0];
+  const tenantUnpaidBills = tenant
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
     : [];
 
@@ -49,7 +49,7 @@ export default function TenantPaymentUploadPage() {
     resolver: zodResolver(paymentUploadFormSchema),
     defaultValues: {
       billId: '',
-      paymentDate: new Date().toISOString().split('T')[0], 
+      paymentDate: new Date().toISOString().split('T')[0],
       proofOfPayment: undefined,
       notes: '',
     },
@@ -68,7 +68,7 @@ export default function TenantPaymentUploadPage() {
     form.reset();
     setIsLoading(false);
   };
-  
+
   const onInvalidSubmit = (errors: any) => {
     console.error("Tenant Payment Upload Validation Errors:", errors);
     toast({
@@ -85,7 +85,7 @@ export default function TenantPaymentUploadPage() {
             <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
             <Card><CardContent className="p-6 text-center text-muted-foreground">Could not load tenant information. Please try again.</CardContent></Card>
         </div>
-    )
+    );
   }
 
   return (
@@ -142,7 +142,7 @@ export default function TenantPaymentUploadPage() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="proofOfPayment"
@@ -150,8 +150,8 @@ export default function TenantPaymentUploadPage() {
                     <FormItem>
                     <FormLabel>Proof of Payment (Max 5MB: PDF, JPG, PNG)</FormLabel>
                     <FormControl>
-                        <Input 
-                        type="file" 
+                        <Input
+                        type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
                         onBlur={onBlur}
                         name={name}
@@ -197,3 +197,5 @@ export default function TenantPaymentUploadPage() {
     </div>
   );
 }
+
+    
