@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,15 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getBuildings } from '@/lib/propertyStore'; 
-import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; // Using unitStore
-import { mockTenants, mockRepairs } from '@/lib/mockData'; // Tenants, repairs still from mockData
+import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; 
+import { mockTenants, mockRepairs } from '@/lib/mockData'; 
 import type { Unit, Tenant, Repair } from '@/lib/types';
-import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle } from 'lucide-react';
+import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 export default function UnitDetailsPage() {
   const params = useParams();
+  const router = useRouter(); // Initialize router
   const buildingId = params.buildingId as string;
   const unitId = params.unitId as string;
   const { toast } = useToast();
@@ -38,19 +39,18 @@ export default function UnitDetailsPage() {
       setUnit(currentUnit);
     };
 
-    updateUnit(); // Initial fetch
+    updateUnit(); 
 
-    const unsubscribe = subscribeToUnits(updateUnit); // Subscribe to all unit changes for simplicity
+    const unsubscribe = subscribeToUnits(updateUnit); 
     return () => unsubscribe();
   }, [buildingId, unitId]);
 
 
-  // Tenant and repairs are still derived from mockData for now, or from the unit object if populated
-  const tenant = unit?.tenantId ? mockTenants.find(t => t.id === unit.tenantId) : (unit?.tenant);
+  const tenant = unit?.tenant; // Directly use unit.tenant if populated by assignTenantToUnit
   const repairsForUnit = unit ? (unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId)) : [];
 
 
-  if (!building) { // Check for building first
+  if (!building) { 
     return (
       <div className="text-center py-10">
         <h2 className="text-2xl font-semibold">Building not found</h2>
@@ -63,7 +63,6 @@ export default function UnitDetailsPage() {
     );
   }
   
-  // Separate check for unit after building is confirmed
   if (!unit) {
      return (
       <div className="text-center py-10">
@@ -89,8 +88,11 @@ export default function UnitDetailsPage() {
   };
 
   const handleAssignTenant = () => {
-    console.log("Assign Tenant clicked for unit:", unitId);
-    toast({ title: "Action: Assign Tenant", description: "Functionality to assign a tenant to this vacant unit would be triggered here." });
+    if (unit && unit.status === 'vacant') {
+      router.push(`/properties/${buildingId}/${unitId}/assign-tenant`);
+    } else {
+      toast({ title: "Unit Occupied", description: "This unit is already occupied or cannot be assigned a tenant."});
+    }
   };
   
   const handleEditUnitDetails = () => {
@@ -104,9 +106,17 @@ export default function UnitDetailsPage() {
   };
 
   const handleMarkAsVacant = () => {
+    // This would ideally update the unitStore and also unassign the tenant in mockTenants/tenantStore
     console.log("Mark as Vacant clicked for unit:", unitId);
     toast({ title: "Action: Mark as Vacant", description: "Unit status would be updated to vacant (mocked)." });
-    // Here you would typically update the unit's status in your state/backend
+    // Example (incomplete, needs store update):
+    // if (unit && unit.tenant) {
+    //   const tenantToUnassign = mockTenants.find(t => t.id === unit.tenant!.id);
+    //   if (tenantToUnassign) {
+    //     tenantToUnassign.unitId = ''; // Clear assignment
+    //   }
+    //   // Call a function in unitStore like unassignTenantFromUnit(unit.id)
+    // }
   };
 
 
@@ -163,7 +173,9 @@ export default function UnitDetailsPage() {
                     <div className="text-center py-6 text-muted-foreground">
                       <HomeIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
                       <p>This unit is currently vacant.</p>
-                      <Button variant="outline" size="sm" className="mt-4" onClick={handleAssignTenant}>Assign Tenant</Button>
+                      <Button variant="outline" size="sm" className="mt-4 flex items-center" onClick={handleAssignTenant}>
+                        <UserPlus className="mr-2 h-4 w-4" /> Assign Tenant
+                      </Button>
                     </div>
                   )}
                 </TabsContent>
@@ -224,11 +236,17 @@ export default function UnitDetailsPage() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                     <Button variant="outline" className="w-full" onClick={handleEditUnitDetails}>Edit Unit Details</Button>
-                    <Button variant="outline" className="w-full" onClick={handleManageLease}>Manage Lease</Button>
-                    <Button variant="destructive" className="w-full" onClick={handleMarkAsVacant}>Mark as Vacant</Button>
+                    <Button variant="outline" className="w-full" onClick={handleManageLease} disabled={!tenant}>Manage Lease</Button>
+                    {unit.status === 'occupied' && tenant && (
+                         <Button variant="destructive" className="w-full" onClick={handleMarkAsVacant}>Mark as Vacant / Unassign Tenant</Button>
+                    )}
+                     {unit.status === 'vacant' && (
+                        <Button variant="default" className="w-full flex items-center" onClick={handleAssignTenant}>
+                            <UserPlus className="mr-2 h-4 w-4" /> Assign Tenant to Unit
+                        </Button>
+                    )}
                 </CardContent>
             </Card>
-            {/* Could add a small gallery or notes section here */}
         </div>
       </div>
     </div>

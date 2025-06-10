@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Unit } from './types';
+import type { Unit, Tenant } from './types';
 import { mockUnits as initialMockUnitsData } from './mockData';
 
 // Make a mutable copy for our store, initialized with data from mockData.ts
@@ -33,6 +33,26 @@ export const addUnitToStore = (newUnitData: Omit<Unit, 'id' | 'buildingId' | 'te
   listeners.forEach(listener => listener()); // Notify all subscribers
   return newUnit;
 };
+
+export const assignTenantToUnit = (unitId: string, tenant: Tenant): Unit | undefined => {
+  let updatedUnit: Unit | undefined;
+  currentUnitsStore = currentUnitsStore.map(unit => {
+    if (unit.id === unitId) {
+      updatedUnit = {
+        ...unit,
+        tenant: tenant,
+        status: 'occupied',
+      };
+      return updatedUnit;
+    }
+    return unit;
+  });
+  if (updatedUnit) {
+    listeners.forEach(listener => listener());
+  }
+  return updatedUnit;
+};
+
 
 export const subscribeToUnits = (listener: () => void): (() => void) => {
   listeners.add(listener);
