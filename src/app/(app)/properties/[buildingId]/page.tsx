@@ -106,8 +106,10 @@ export default function BuildingDetailsPage() {
                 <TabsTrigger value="financials">Financials</TabsTrigger>
                 <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
               </TabsList>
-               <Button size="sm" variant="outline">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Unit
+               <Button asChild size="sm" variant="outline">
+                <Link href={`/properties/${building.id}/add-unit`}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Unit
+                </Link>
               </Button>
             </div>
             
