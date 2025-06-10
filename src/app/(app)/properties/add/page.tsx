@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
+import { addBuildingToStore } from '@/lib/propertyStore'; // Import store function
 import { ArrowLeft, Loader2, PlusCircle } from 'lucide-react';
 
 const propertyFormSchema = z.object({
@@ -30,6 +32,7 @@ type PropertyFormValues = z.infer<typeof propertyFormSchema>;
 export default function AddPropertyPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
+  const router = useRouter(); // Initialize router
 
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(propertyFormSchema),
@@ -43,28 +46,29 @@ export default function AddPropertyPage() {
 
   const onSubmit: SubmitHandler<PropertyFormValues> = async (data) => {
     setIsLoading(true);
-    console.log("New Property Data:", data);
-    // Simulate API call to add property
-    // In a real application, you would make a request to your backend here.
-    // For example: const newProperty = await api.addProperty(data);
     
-    // For mock purposes:
-    const newProperty = { 
-      id: `building-${Date.now()}`, 
-      ...data, 
-      occupiedUnits: 0, // New properties start with 0 occupied units
-      totalIncome: 0, // New properties start with 0 income
-    };
-    console.log("Mocked New Property Entry:", newProperty);
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+    try {
+      const addedBuilding = addBuildingToStore(data); 
 
-    toast({
-      title: "Property Added (Mock)",
-      description: `${data.name} has been successfully added. (This is a mock submission)`,
-    });
-    form.reset(); // Reset form fields
-    setIsLoading(false);
+      toast({
+        title: "Property Added",
+        description: `${addedBuilding.name} has been successfully added.`,
+      });
+      form.reset();
+      router.push('/properties'); // Redirect to properties page
+    } catch (error) {
+      console.error("Failed to add property:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Add Property",
+        description: "An unexpected error occurred. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -160,4 +164,3 @@ export default function AddPropertyPage() {
     </div>
   );
 }
-

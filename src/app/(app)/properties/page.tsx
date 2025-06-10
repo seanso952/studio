@@ -3,10 +3,11 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockBuildings } from '@/lib/mockData';
+import { getBuildings, subscribeToBuildings } from '@/lib/propertyStore'; // Import store functions
 import type { Building } from '@/lib/types';
 import { PlusCircle, MapPin, Users, Home } from 'lucide-react';
 
@@ -51,6 +52,25 @@ function PropertyCard({ building }: { building: Building }) {
 }
 
 export default function PropertiesPage() {
+  // Initialize state with a function to get initial buildings only once
+  const [buildings, setBuildings] = React.useState<Building[]>(() => getBuildings());
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeToBuildings(() => {
+      setBuildings(getBuildings()); // Update state when store changes
+    });
+    
+    // It's good practice to also fetch the latest state right after subscribing,
+    // in case the store was updated between the initial useState and the effect running.
+    // However, this might be redundant if subscribeToBuildings immediately calls back
+    // or if the initial useState(() => getBuildings()) is sufficient.
+    // For robustness in case of timing issues:
+    setBuildings(getBuildings());
+
+
+    return () => unsubscribe(); // Cleanup subscription on component unmount
+  }, []); // Empty dependency array ensures this runs once on mount
+
   return (
     <div className="space-y-6">
       <PageHeader title="Properties" description="Manage all your real estate properties.">
@@ -61,9 +81,9 @@ export default function PropertiesPage() {
         </Button>
       </PageHeader>
 
-      {mockBuildings.length > 0 ? (
+      {buildings.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockBuildings.map((building) => (
+          {buildings.map((building) => (
             <PropertyCard key={building.id} building={building} />
           ))}
         </div>
@@ -82,4 +102,3 @@ export default function PropertiesPage() {
     </div>
   );
 }
-
