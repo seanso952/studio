@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Landmark, LogIn, Loader2, AlertTriangle } from 'lucide-react';
-import { auth } from '@/lib/firebaseConfig';
+import { auth } from '@/lib/firebaseConfig'; // Import auth from firebaseConfig
 import { signInWithEmailAndPassword } from 'firebase/auth';
 
 const loginFormSchema = z.object({
@@ -40,6 +40,15 @@ export default function LoginPage() {
   const onSubmit: SubmitHandler<LoginFormValues> = async (data) => {
     setIsLoading(true);
     setFirebaseError(null);
+
+    if (!auth) {
+      const authUnavailableError = "Authentication service is not available. Please check Firebase configuration (e.g., API key).";
+      setFirebaseError(authUnavailableError);
+      toast({ variant: "destructive", title: "Login Failed", description: authUnavailableError });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
@@ -48,7 +57,7 @@ export default function LoginPage() {
       });
       // onAuthStateChanged in authStore will handle user state update
       // Redirect based on role will be handled by AppShell or dashboard
-      router.push('/dashboard'); 
+      router.push('/dashboard');
     } catch (error: any) {
       console.error("Firebase login error:", error);
       let errorMessage = "Failed to login. Please check your credentials.";
@@ -57,13 +66,16 @@ export default function LoginPage() {
           case 'auth/user-not-found':
           case 'auth/wrong-password':
           case 'auth/invalid-credential':
-            errorMessage = "Invalid email or password.";
+            errorMessage = "Invalid email or password. Please ensure the account exists and credentials are correct.";
             break;
           case 'auth/invalid-email':
             errorMessage = "Please enter a valid email address.";
             break;
+          case 'auth/user-disabled':
+            errorMessage = "This user account has been disabled.";
+            break;
           default:
-            errorMessage = "An unexpected error occurred. Please try again.";
+            errorMessage = "An unexpected error occurred during login. Please try again.";
         }
       }
       setFirebaseError(errorMessage);
@@ -151,7 +163,8 @@ export default function LoginPage() {
                 Sign Up
             </Link>
             <p className="text-xs text-muted-foreground mt-4">
-                Test with: admin@example.com, manager@example.com, or alice@example.com (pw: password)
+                Example accounts (e.g., admin@example.com, manager@example.com, alice@example.com with password &quot;password&quot;)
+                must be created in your Firebase Authentication console before you can use them to log in.
             </p>
         </div>
       </Card>
