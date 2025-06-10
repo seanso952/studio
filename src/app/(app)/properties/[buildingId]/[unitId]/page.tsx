@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -12,11 +13,13 @@ import { mockBuildings, mockUnits, mockTenants, mockRepairs } from '@/lib/mockDa
 import type { Unit, Tenant, Repair } from '@/lib/types';
 import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export default function UnitDetailsPage() {
   const params = useParams();
   const buildingId = params.buildingId as string;
   const unitId = params.unitId as string;
+  const { toast } = useToast();
 
   const unit = mockUnits.find(u => u.id === unitId && u.buildingId === buildingId);
   const building = mockBuildings.find(b => b.id === buildingId);
@@ -35,6 +38,38 @@ export default function UnitDetailsPage() {
       </div>
     );
   }
+
+  const handleLogRepair = () => {
+    console.log("Log Repair clicked for unit:", unitId);
+    toast({ title: "Action: Log Repair", description: "Functionality to log a new repair would be triggered here." });
+  };
+
+  const handleUploadDocument = () => {
+    console.log("Upload Document clicked for unit:", unitId);
+    toast({ title: "Action: Upload Document", description: "Functionality to upload a unit-specific document would be triggered here." });
+  };
+
+  const handleAssignTenant = () => {
+    console.log("Assign Tenant clicked for unit:", unitId);
+    toast({ title: "Action: Assign Tenant", description: "Functionality to assign a tenant to this vacant unit would be triggered here." });
+  };
+  
+  const handleEditUnitDetails = () => {
+    console.log("Edit Unit Details clicked for unit:", unitId);
+    toast({ title: "Action: Edit Unit Details", description: "Navigate to unit edit page or open edit modal." });
+  };
+
+  const handleManageLease = () => {
+    console.log("Manage Lease clicked for unit:", unitId);
+    toast({ title: "Action: Manage Lease", description: "Open lease management options for this unit." });
+  };
+
+  const handleMarkAsVacant = () => {
+    console.log("Mark as Vacant clicked for unit:", unitId);
+    toast({ title: "Action: Mark as Vacant", description: "Unit status would be updated to vacant (mocked)." });
+    // Here you would typically update the unit's status in your state/backend
+  };
+
 
   return (
     <div className="space-y-6">
@@ -89,7 +124,7 @@ export default function UnitDetailsPage() {
                     <div className="text-center py-6 text-muted-foreground">
                       <HomeIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
                       <p>This unit is currently vacant.</p>
-                      <Button variant="outline" size="sm" className="mt-4">Assign Tenant</Button>
+                      <Button variant="outline" size="sm" className="mt-4" onClick={handleAssignTenant}>Assign Tenant</Button>
                     </div>
                   )}
                 </TabsContent>
@@ -97,7 +132,7 @@ export default function UnitDetailsPage() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle className="font-headline flex items-center"><Wrench className="mr-2 h-6 w-6 text-primary"/>Repair History</CardTitle>
-                       <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Log Repair</Button>
+                       <Button variant="outline" size="sm" onClick={handleLogRepair}><PlusCircle className="mr-2 h-4 w-4" /> Log Repair</Button>
                     </CardHeader>
                     <CardContent>
                       {repairsForUnit.length > 0 ? (
@@ -132,7 +167,7 @@ export default function UnitDetailsPage() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle className="font-headline">Unit Documents</CardTitle>
-                      <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Upload Document</Button>
+                      <Button variant="outline" size="sm" onClick={handleUploadDocument}><PlusCircle className="mr-2 h-4 w-4" /> Upload Document</Button>
                     </CardHeader>
                     <CardContent>
                       <p className="text-muted-foreground">Unit-specific documents (e.g., inspection reports, floor plans) will be listed here.</p>
@@ -149,9 +184,9 @@ export default function UnitDetailsPage() {
                     <CardTitle className="font-headline">Unit Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    <Button variant="outline" className="w-full">Edit Unit Details</Button>
-                    <Button variant="outline" className="w-full">Manage Lease</Button>
-                    <Button variant="destructive" className="w-full">Mark as Vacant</Button>
+                    <Button variant="outline" className="w-full" onClick={handleEditUnitDetails}>Edit Unit Details</Button>
+                    <Button variant="outline" className="w-full" onClick={handleManageLease}>Manage Lease</Button>
+                    <Button variant="destructive" className="w-full" onClick={handleMarkAsVacant}>Mark as Vacant</Button>
                 </CardContent>
             </Card>
             {/* Could add a small gallery or notes section here */}
@@ -160,3 +195,4 @@ export default function UnitDetailsPage() {
     </div>
   );
 }
+
