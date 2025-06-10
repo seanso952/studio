@@ -50,9 +50,9 @@ export default function AddUnitPage() {
     defaultValues: {
       unitNumber: '',
       size: '',
-      bedrooms: '', // Changed from undefined
-      bathrooms: '', // Changed from undefined
-      monthlyRent: '', // Changed from undefined
+      bedrooms: '' as unknown as number, 
+      bathrooms: '' as unknown as number, 
+      monthlyRent: '' as unknown as number, 
     },
   });
 
@@ -148,7 +148,13 @@ export default function AddUnitPage() {
                     <FormItem>
                       <FormLabel>Bedrooms</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 2" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} />
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 2" 
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -161,7 +167,14 @@ export default function AddUnitPage() {
                     <FormItem>
                       <FormLabel>Bathrooms</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.5" placeholder="e.g., 1.5" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                        <Input 
+                          type="number" 
+                          step="0.5" 
+                          placeholder="e.g., 1.5" 
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -175,7 +188,13 @@ export default function AddUnitPage() {
                   <FormItem>
                     <FormLabel>Monthly Rent ($)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g., 1200" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                      <Input 
+                        type="number" 
+                        placeholder="e.g., 1200" 
+                        {...field} 
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

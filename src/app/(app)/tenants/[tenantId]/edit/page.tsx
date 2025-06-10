@@ -49,7 +49,7 @@ export default function EditTenantProfilePage() {
       phone: '',
       contractStartDate: '',
       contractEndDate: '',
-      rentAmount: '', // Changed from undefined
+      rentAmount: '' as unknown as number,
       tenantType: undefined,
       outstandingBalance: 0,
     },
@@ -217,7 +217,12 @@ export default function EditTenantProfilePage() {
                     <FormItem>
                       <FormLabel>Monthly Rent ($)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 1500" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 1500" 
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -253,7 +258,12 @@ export default function EditTenantProfilePage() {
                   <FormItem>
                     <FormLabel>Outstanding Balance ($)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="e.g., 0" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                      <Input 
+                        type="number" 
+                        placeholder="e.g., 0" 
+                        {...field} 
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -45,7 +45,7 @@ export default function AddTenantPage() {
       phone: '',
       contractStartDate: '',
       contractEndDate: '',
-      rentAmount: '', // Changed from undefined
+      rentAmount: '' as unknown as number, // Initialize as empty string, coerce in schema
       tenantType: undefined,
     },
   });
@@ -170,7 +170,13 @@ export default function AddTenantPage() {
                     <FormItem>
                       <FormLabel>Monthly Rent ($)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g., 1500" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} />
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 1500" 
+                          {...field} 
+                          value={field.value ?? ''}
+                          onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
