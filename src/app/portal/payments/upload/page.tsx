@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { mockTenants, mockBillPayments } from '@/lib/mockData';
-import type { BillPayment } from '@/lib/types';
+import type { BillPayment, Tenant } from '@/lib/types'; // Ensure Tenant is imported
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -40,8 +40,10 @@ export default function TenantPaymentUploadPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const tenant = mockTenants[0];
-  const tenantUnpaidBills = tenant
+  // Simulate fetching the logged-in tenant. In a real app, this would come from auth.
+  const tenant: Tenant | undefined = mockTenants[0]; 
+
+  const tenantUnpaidBills: BillPayment[] = tenant
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
     : [];
 
@@ -49,7 +51,7 @@ export default function TenantPaymentUploadPage() {
     resolver: zodResolver(paymentUploadFormSchema),
     defaultValues: {
       billId: '',
-      paymentDate: new Date().toISOString().split('T')[0],
+      paymentDate: new Date().toISOString().split('T')[0], // Default to today
       proofOfPayment: undefined,
       notes: '',
     },
@@ -59,6 +61,7 @@ export default function TenantPaymentUploadPage() {
     setIsLoading(true);
     console.log("Tenant Payment Upload Data:", data);
 
+    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     toast({
@@ -85,7 +88,7 @@ export default function TenantPaymentUploadPage() {
             <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
             <Card><CardContent className="p-6 text-center text-muted-foreground">Could not load tenant information. Please try again.</CardContent></Card>
         </div>
-    );
+    ); // Critical: Ensure this return statement is properly terminated.
   }
 
   return (
@@ -179,7 +182,7 @@ export default function TenantPaymentUploadPage() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || tenantUnpaidBills.length === 0}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
@@ -197,5 +200,3 @@ export default function TenantPaymentUploadPage() {
     </div>
   );
 }
-
-    
