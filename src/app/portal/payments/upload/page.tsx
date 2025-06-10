@@ -7,20 +7,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
-import { mockTenants, mockBillPayments } from '@/lib/mockData'; // For fetching tenant's bills
+import { mockTenants, mockBillPayments } from '@/lib/mockData'; 
 import type { BillPayment } from '@/lib/types';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
-// Schema for the tenant's payment upload form
 const paymentUploadFormSchema = z.object({
   billId: z.string().min(1, "Please select the bill you are paying for."),
   paymentDate: z.string().min(1, "Payment date is required.").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
@@ -42,7 +40,6 @@ export default function TenantPaymentUploadPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   
-  // For now, hardcode to the first tenant. In a real app, this would come from auth.
   const tenant = mockTenants[0]; 
   const tenantUnpaidBills = tenant 
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
@@ -52,7 +49,7 @@ export default function TenantPaymentUploadPage() {
     resolver: zodResolver(paymentUploadFormSchema),
     defaultValues: {
       billId: '',
-      paymentDate: new Date().toISOString().split('T')[0], // Default to today
+      paymentDate: new Date().toISOString().split('T')[0], 
       proofOfPayment: undefined,
       notes: '',
     },
@@ -62,15 +59,7 @@ export default function TenantPaymentUploadPage() {
     setIsLoading(true);
     console.log("Tenant Payment Upload Data:", data);
 
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // In a real app, you would:
-    // 1. Upload the file (data.proofOfPayment[0]) to a storage service.
-    // 2. Get the URL of the uploaded file.
-    // 3. Send the data (billId, paymentDate, file URL, notes) to your backend.
-    // 4. The backend would update the bill's status to 'pending' (for admin approval),
-    //    store the payment date, proof URL, and notes.
 
     toast({
       title: "Payment Submitted",
@@ -125,7 +114,7 @@ export default function TenantPaymentUploadPage() {
                     <FormLabel>Select Bill</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Choose a bill to pay..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Choose a bill to pay..." /></SelectValue>
                       </FormControl>
                       <SelectContent>
                         {tenantUnpaidBills.length > 0 ? tenantUnpaidBills.map(bill => (

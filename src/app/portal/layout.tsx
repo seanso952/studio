@@ -3,7 +3,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Landmark, UserCircle, FileText, UploadCloud, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PageHeader } from '@/components/shared/PageHeader'; // Assuming this can be reused or a simpler one created
 
 export const metadata: Metadata = {
   title: 'Tenant Portal',
