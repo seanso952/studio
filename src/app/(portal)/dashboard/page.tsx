@@ -1,7 +1,3 @@
-
-// This file is part of a conflicting route group (portal).
-// The active page can be found at /src/app/portal/dashboard/page.tsx
-// To resolve the conflict, please delete the src/app/(portal) directory.
-export default function ConflictingPlaceholderPage() {
-  return null;
-}
+// This file is part of a conflicting route group '(portal)'
+// and should be deleted. The active code is in /src/app/portal/dashboard/page.tsx.
+// This file is intentionally left without a default export to avoid routing conflicts.
