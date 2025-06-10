@@ -1,4 +1,6 @@
 
+import type { User as FirebaseUser } from 'firebase/auth';
+
 export interface Repair {
   id: string;
   date: string;
@@ -34,7 +36,7 @@ export interface Unit {
   buildingId: string;
   tenant?: Tenant;
   repairs: Repair[];
-  size: string; 
+  size: string;
   bedrooms: number;
   bathrooms: number;
   status: 'occupied' | 'vacant';
@@ -49,7 +51,6 @@ export interface Building {
   numberOfUnits: number;
   occupiedUnits: number;
   totalIncome?: number;
-  // assignedManagerId?: string; // For simplicity, manager assignments will be on the mock user for now
 }
 
 export type BillStatus = 'pending' | 'approved' | 'rejected' | 'paid';
@@ -59,25 +60,25 @@ export type BillType = 'electricity' | 'water' | 'association_dues' | 'rent' | '
 export interface BillPayment {
   id: string;
   tenantId: string;
-  tenantName?: string; 
-  unitNumber?: string; 
-  buildingName?: string; 
+  tenantName?: string;
+  unitNumber?: string;
+  buildingName?: string;
   billType: BillType;
   amount: number;
   dueDate: string;
   paymentDate?: string;
-  proofOfPaymentUrl?: string; 
+  proofOfPaymentUrl?: string;
   status: BillStatus;
   adminNotes?: string;
-  isOverdue?: boolean; 
+  isOverdue?: boolean;
 }
 
 export interface BouncedCheck {
   id: string;
   tenantId: string;
-  tenantName?: string; 
-  unitNumber?: string; 
-  buildingName?: string; 
+  tenantName?: string;
+  unitNumber?: string;
+  buildingName?: string;
   checkNumber: string;
   amount: number;
   bounceDate: string;
@@ -97,12 +98,13 @@ export interface DocumentSummary {
   url: string;
 }
 
-// Added for simulated auth
-export type UserRole = 'admin' | 'manager' | 'tenant';
+export type UserRole = 'admin' | 'manager' | 'tenant' | null; // null for unauthenticated
 
 export interface MockAuthUser {
-  id: string;
+  id: string; // Firebase UID
   name: string;
+  email?: string | null;
   role: UserRole;
   assignedBuildingIds?: string[]; // For managers
+  firebaseUser?: FirebaseUser | null; // Store the actual Firebase user object
 }
