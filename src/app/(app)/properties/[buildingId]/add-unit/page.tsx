@@ -50,9 +50,9 @@ export default function AddUnitPage() {
     defaultValues: {
       unitNumber: '',
       size: '',
-      bedrooms: undefined,
-      bathrooms: undefined,
-      monthlyRent: undefined,
+      bedrooms: '', // Changed from undefined
+      bathrooms: '', // Changed from undefined
+      monthlyRent: '', // Changed from undefined
     },
   });
 

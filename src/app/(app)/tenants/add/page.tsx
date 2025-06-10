@@ -45,7 +45,7 @@ export default function AddTenantPage() {
       phone: '',
       contractStartDate: '',
       contractEndDate: '',
-      rentAmount: undefined,
+      rentAmount: '', // Changed from undefined
       tenantType: undefined,
     },
   });

@@ -49,7 +49,7 @@ export default function EditTenantProfilePage() {
       phone: '',
       contractStartDate: '',
       contractEndDate: '',
-      rentAmount: undefined,
+      rentAmount: '', // Changed from undefined
       tenantType: undefined,
       outstandingBalance: 0,
     },
