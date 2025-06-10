@@ -20,6 +20,7 @@ import type { Tenant } from '@/lib/types';
 import { ArrowLeft, Loader2, UploadCloud } from 'lucide-react';
 
 const documentTypeValues = ['receipt', 'form2307', 'lease_agreement', 'other'] as const;
+const NO_TENANT_SELECTED_VALUE = "__NO_TENANT_SELECTED__"; // Unique value for "None" option
 
 const documentUploadFormSchema = z.object({
   documentName: z.string().min(3, "Document name is required (min 3 chars)."),
@@ -54,7 +55,7 @@ export default function UploadDocumentPage() {
     defaultValues: {
       documentName: '',
       documentType: undefined,
-      tenantId: '',
+      tenantId: undefined, // Changed from '' to undefined
       file: undefined,
       notes: '',
     },
@@ -141,12 +142,15 @@ export default function UploadDocumentPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Associate with Tenant (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <Select
+                        onValueChange={(value) => field.onChange(value === NO_TENANT_SELECTED_VALUE ? undefined : value)}
+                        value={field.value ?? ""} // Pass "" to Select if field.value is undefined to show placeholder
+                      >
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select tenant..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None (General Document)</SelectItem>
+                          <SelectItem value={NO_TENANT_SELECTED_VALUE}>None (General Document)</SelectItem>
                           {tenants.map(tenant => (
                             <SelectItem key={tenant.id} value={tenant.id}>
                               {tenant.name} ({tenant.buildingName} - {tenant.unitNumber})
