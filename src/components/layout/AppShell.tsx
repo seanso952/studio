@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCurrentUser, logoutFirebaseUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
+import { auth } from '@/lib/firebaseConfig'; // Import auth
 
 const navItemsAdmin = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -82,9 +83,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
     
     // Initial check in case subscription fires after first render
-    if (getCurrentUser() === null && typeof window !== 'undefined' && auth.currentUser === null) {
+    // Check if auth is defined before accessing auth.currentUser
+    if (getCurrentUser() === null && typeof window !== 'undefined' && auth && auth.currentUser === null) {
        setAuthLoading(false);
        if (pathname !== '/login') router.push('/login');
+    } else if (getCurrentUser() === null && typeof window !== 'undefined' && !auth) {
+      // If auth itself is not defined (due to API key missing), also stop loading and redirect.
+      setAuthLoading(false);
+      if (pathname !== '/login') router.push('/login');
     }
 
 
