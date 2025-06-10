@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -8,7 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockBuildings, mockUnits } from '@/lib/mockData';
+import { getBuildings } from '@/lib/propertyStore'; // Changed from mockData
+import { mockUnits } from '@/lib/mockData'; // Units still from mockData for now
 import type { Building, Unit } from '@/lib/types';
 import { ArrowLeft, PlusCircle, Home, Users, BedDouble, Bath, DollarSign, Wrench } from 'lucide-react';
 
@@ -38,7 +40,10 @@ function UnitCard({ unit, buildingName }: { unit: Unit; buildingName: string }) 
 export default function BuildingDetailsPage() {
   const params = useParams();
   const buildingId = params.buildingId as string;
-  const building = mockBuildings.find(b => b.id === buildingId);
+  
+  const allBuildings = getBuildings();
+  const building = allBuildings.find(b => b.id === buildingId);
+  
   const unitsInBuilding = mockUnits.filter(u => u.buildingId === buildingId);
 
   if (!building) {

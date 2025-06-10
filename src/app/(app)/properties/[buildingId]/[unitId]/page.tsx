@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockBuildings, mockUnits, mockTenants, mockRepairs } from '@/lib/mockData';
+import { getBuildings } from '@/lib/propertyStore'; // Changed from mockData
+import { mockUnits, mockTenants, mockRepairs } from '@/lib/mockData'; // Units, tenants, repairs still from mockData
 import type { Unit, Tenant, Repair } from '@/lib/types';
 import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -22,7 +23,10 @@ export default function UnitDetailsPage() {
   const { toast } = useToast();
 
   const unit = mockUnits.find(u => u.id === unitId && u.buildingId === buildingId);
-  const building = mockBuildings.find(b => b.id === buildingId);
+  
+  const allBuildings = getBuildings();
+  const building = allBuildings.find(b => b.id === buildingId);
+  
   const tenant = unit?.tenantId ? mockTenants.find(t => t.id === unit.tenantId) : undefined;
   const repairsForUnit = mockRepairs.filter(r => r.unitId === unitId);
 
@@ -195,4 +199,3 @@ export default function UnitDetailsPage() {
     </div>
   );
 }
-
