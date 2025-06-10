@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -55,7 +56,7 @@ export default function PropertiesPage() {
       <PageHeader title="Properties" description="Manage all your real estate properties.">
         <Button asChild>
           <Link href="/properties/add">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Property
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
           </Link>
         </Button>
       </PageHeader>
@@ -72,7 +73,7 @@ export default function PropertiesPage() {
             <p className="text-muted-foreground">No properties found. Add your first property to get started.</p>
             <Button asChild className="mt-4">
               <Link href="/properties/add">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Property
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Property
               </Link>
             </Button>
           </CardContent>
@@ -81,3 +82,4 @@ export default function PropertiesPage() {
     </div>
   );
 }
+
