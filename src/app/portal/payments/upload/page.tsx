@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
-import { mockBillPayments } from '@/lib/mockData'; // Bill payments remain from mock for now
+import { mockBillPayments } from '@/lib/mockData'; 
 import type { BillPayment, Tenant } from '@/lib/types';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -40,21 +40,21 @@ type PaymentUploadFormValues = z.infer<typeof paymentUploadFormSchema>;
 export default function TenantPaymentUploadPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
-
-  // Simulate 'tenant1' (Alice Wonderland) being the logged-in tenant
   const tenantIdForPortal = 'tenant1'; 
   const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
   
-  React.useEffect(() => {
-    const updateTenantData = () => {
-      setTenant(getTenantById(tenantIdForPortal));
-    };
-    updateTenantData(); // Initial fetch
-    const unsubscribe = subscribeToTenants(updateTenantData);
-    return unsubscribe; // Cleanup subscription on unmount
+  const updateTenantData = React.useCallback(() => {
+    setTenant(getTenantById(tenantIdForPortal));
   }, [tenantIdForPortal]);
+
+  React.useEffect(() => {
+    updateTenantData();
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return () => {
+      unsubscribe();
+    };
+  }, [updateTenantData]);
   
-  // Derive unpaid bills based on the reactive tenant state
   const tenantUnpaidBills: BillPayment[] = tenant
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
     : [];
@@ -63,7 +63,7 @@ export default function TenantPaymentUploadPage() {
     resolver: zodResolver(paymentUploadFormSchema),
     defaultValues: {
       billId: '',
-      paymentDate: new Date().toISOString().split('T')[0], // Default to today
+      paymentDate: new Date().toISOString().split('T')[0], 
       proofOfPayment: undefined,
       notes: '',
     },
@@ -72,10 +72,7 @@ export default function TenantPaymentUploadPage() {
   const onSubmit: SubmitHandler<PaymentUploadFormValues> = async (data) => {
     setIsLoading(true);
     console.log("Tenant Payment Upload Data:", data);
-
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
-
     toast({
       title: "Payment Submitted",
       description: "Your proof of payment has been uploaded and is pending review. Thank you!",

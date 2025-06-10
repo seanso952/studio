@@ -2,14 +2,14 @@
 'use client';
 
 import * as React from 'react';
-import type { Metadata } from 'next';
+// import type { Metadata } from 'next'; // Metadata can't be dynamic in client components easily
 import Link from 'next/link';
 import { Landmark, UserCircle, FileText, UploadCloud, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
 import type { Tenant } from '@/lib/types';
 
-// export const metadata: Metadata = { // Metadata can't be dynamic in client components easily
+// export const metadata: Metadata = {
 //   title: 'Tenant Portal',
 //   description: 'Manage your tenancy agreement and payments.',
 // };
@@ -22,14 +22,17 @@ export default function PortalLayout({
   const tenantIdForPortal = 'tenant1'; // Alice Wonderland
   const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
 
-  React.useEffect(() => {
-    const updateTenantData = () => {
-      setTenant(getTenantById(tenantIdForPortal));
-    };
-    updateTenantData();
-    const unsubscribe = subscribeToTenants(updateTenantData);
-    return unsubscribe;
+  const updateTenantData = React.useCallback(() => {
+    setTenant(getTenantById(tenantIdForPortal));
   }, [tenantIdForPortal]);
+
+  React.useEffect(() => {
+    updateTenantData(); // Call to set initial/updated data
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return () => {
+      unsubscribe();
+    };
+  }, [updateTenantData]);
 
   const tenantName = tenant ? tenant.name : "Tenant"; 
 

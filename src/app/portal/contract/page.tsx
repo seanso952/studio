@@ -14,18 +14,20 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function TenantContractPage() {
-  // Simulate 'tenant1' (Alice Wonderland) being the logged-in tenant
   const tenantIdForPortal = 'tenant1';
   const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
 
-  React.useEffect(() => {
-    const updateTenantData = () => {
-      setTenant(getTenantById(tenantIdForPortal));
-    };
-    updateTenantData(); // Initial fetch
-    const unsubscribe = subscribeToTenants(updateTenantData);
-    return unsubscribe; // Cleanup subscription on unmount
+  const updateTenantData = React.useCallback(() => {
+    setTenant(getTenantById(tenantIdForPortal));
   }, [tenantIdForPortal]);
+
+  React.useEffect(() => {
+    updateTenantData();
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return () => {
+      unsubscribe();
+    };
+  }, [updateTenantData]);
 
   if (!tenant) {
     return (
@@ -79,7 +81,7 @@ export default function TenantContractPage() {
           </div>
         </CardContent>
       </Card>
-       <Card className="shadow-lg">
+       <Card className="shadow-lg mt-6"> {/* Added mt-6 for spacing from previous card */}
         <CardHeader>
           <CardTitle className="font-headline">Form 2307 Submissions</CardTitle>
           <CardDescription>If you are a receipted tenant, your submitted Form 2307s are listed here.</CardDescription>
