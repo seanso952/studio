@@ -37,6 +37,8 @@ import {
   Settings,
   LogOut,
   Landmark,
+  UserSquare,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -99,6 +101,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="start" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    <span>Switch to Admin View</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/portal/dashboard">
+                    <UserSquare className="mr-2 h-4 w-4" />
+                    <span>Switch to Client View</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
