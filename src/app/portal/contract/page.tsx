@@ -5,7 +5,7 @@ import * as React from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockTenants } from '@/lib/mockData';
+import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
 import type { Tenant } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileText, CalendarRange, User, Home, DollarSign, AlertTriangle } from 'lucide-react';
@@ -14,8 +14,18 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function TenantContractPage() {
-  // For now, hardcode to the first tenant. In a real app, this would come from auth.
-  const tenant: Tenant | undefined = mockTenants[0]; 
+  // Simulate 'tenant1' (Alice Wonderland) being the logged-in tenant
+  const tenantIdForPortal = 'tenant1';
+  const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
+
+  React.useEffect(() => {
+    const updateTenantData = () => {
+      setTenant(getTenantById(tenantIdForPortal));
+    };
+    updateTenantData(); // Initial fetch
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return unsubscribe; // Cleanup subscription on unmount
+  }, [tenantIdForPortal]);
 
   if (!tenant) {
     return (

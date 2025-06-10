@@ -7,16 +7,31 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockTenants, mockBillPayments } from '@/lib/mockData';
+import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
+import { mockBillPayments } from '@/lib/mockData'; // Bill payments remain from mock for now
 import type { Tenant, BillPayment } from '@/lib/types';
 import { FileText, DollarSign, AlertTriangle, CalendarDays, UploadCloud, ArrowRight } from 'lucide-react';
 import { format, differenceInDays, isBefore } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 export default function TenantDashboardPage() {
-  // For now, hardcode to the first tenant. In a real app, this would come from auth.
-  const tenant: Tenant | undefined = mockTenants[0]; 
-  const tenantBills: BillPayment[] = tenant ? mockBillPayments.filter(bill => bill.tenantId === tenant.id) : [];
+  // Simulate 'tenant1' (Alice Wonderland) being the logged-in tenant
+  const tenantIdForPortal = 'tenant1'; 
+  const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
+  
+  React.useEffect(() => {
+    const updateTenantData = () => {
+      setTenant(getTenantById(tenantIdForPortal));
+    };
+    updateTenantData(); // Initial fetch
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return unsubscribe; // Cleanup subscription on unmount
+  }, [tenantIdForPortal]);
+
+  // Derive bills based on the reactive tenant state
+  const tenantBills: BillPayment[] = tenant 
+    ? mockBillPayments.filter(bill => bill.tenantId === tenant.id) 
+    : [];
 
   if (!tenant) {
     return (

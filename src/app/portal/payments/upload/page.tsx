@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
-import { mockTenants, mockBillPayments } from '@/lib/mockData';
+import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
+import { mockBillPayments } from '@/lib/mockData'; // Bill payments remain from mock for now
 import type { BillPayment, Tenant } from '@/lib/types';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -40,9 +41,20 @@ export default function TenantPaymentUploadPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
 
-  // Simulate fetching the logged-in tenant. In a real app, this would come from auth.
-  const tenant: Tenant | undefined = mockTenants[0];
-
+  // Simulate 'tenant1' (Alice Wonderland) being the logged-in tenant
+  const tenantIdForPortal = 'tenant1'; 
+  const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantIdForPortal));
+  
+  React.useEffect(() => {
+    const updateTenantData = () => {
+      setTenant(getTenantById(tenantIdForPortal));
+    };
+    updateTenantData(); // Initial fetch
+    const unsubscribe = subscribeToTenants(updateTenantData);
+    return unsubscribe; // Cleanup subscription on unmount
+  }, [tenantIdForPortal]);
+  
+  // Derive unpaid bills based on the reactive tenant state
   const tenantUnpaidBills: BillPayment[] = tenant
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
     : [];
@@ -81,7 +93,6 @@ export default function TenantPaymentUploadPage() {
     });
   };
 
-  // Conditional return for when tenant is not found
   if (!tenant) {
     return (
          <div className="space-y-6">
@@ -91,7 +102,6 @@ export default function TenantPaymentUploadPage() {
     );
   }
 
-  // Main component return
   return (
     <div className="space-y-6">
       <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation for an outstanding bill.">
