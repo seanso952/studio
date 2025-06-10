@@ -29,39 +29,32 @@ const billPaymentFormSchema = z.object({
   tenantId: z.string().min(1, "Tenant is required"),
   billType: z.enum(billTypeValues, { required_error: "Bill type is required" }),
   amount: z.coerce.number({invalid_type_error: "Amount must be a number"}).positive("Amount must be positive"),
-  paymentDate: z.string().min(1, "Payment date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
-  proofOfPayment: z.any() // Base type is any
+  billDueDate: z.string().min(1, "Bill due date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  proofOfPayment: z.any()
     .refine(
       (value) => {
-        // If value is null or undefined, it's valid (handled by optional/nullable later)
         if (value == null) return true;
-
-        // Check if we're in an environment where FileList is defined (browser)
         if (typeof FileList !== 'undefined') {
-          if (!(value instanceof FileList)) {
-            return false; // If not a FileList on client, invalid
-          }
-          // Now we know value is a FileList
-          if (value.length === 0) return true; // Empty FileList is valid (no file selected)
-          return value[0].size <= 5 * 1024 * 1024; // Check size of the first file (5MB limit)
+          if (!(value instanceof FileList)) return false;
+          if (value.length === 0) return true;
+          return value[0].size <= 5 * 1024 * 1024; 
         }
-        
-        // If FileList is not defined (server-side) and value is not null/undefined,
-        // this is an unexpected state for a file input. Consider it invalid.
         return false;
       },
-      {
-        message: 'Proof of payment must be a valid file (max 5MB) or not provided.',
-      }
+      { message: 'Proof of payment must be a valid file (max 5MB) or not provided.'}
     )
-    .optional() // Makes the field itself optional (can be omitted)
-    .nullable(), // Allows the field to be explicitly null
+    .optional()
+    .nullable(),
   notes: z.string().optional(),
 });
 
 type BillPaymentFormValues = z.infer<typeof billPaymentFormSchema>;
 
-function BillPaymentForm() {
+interface BillPaymentFormProps {
+  onPaymentLogged: (newPayment: BillPayment) => void;
+}
+
+function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
@@ -71,7 +64,7 @@ function BillPaymentForm() {
       tenantId: '',
       billType: undefined,
       amount: undefined,
-      paymentDate: '',
+      billDueDate: '',
       proofOfPayment: null,
       notes: '',
     },
@@ -80,15 +73,33 @@ function BillPaymentForm() {
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
     console.log("Form submitted successfully with data:", data);
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log("Bill Payment Data:", data);
-    if (data.proofOfPayment && data.proofOfPayment.length > 0) {
-        console.log("Proof of payment file:", data.proofOfPayment[0].name);
-    }
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+
+    const tenantDetails = mockTenants.find(t => t.id === data.tenantId);
+    const newPaymentId = `bill-${Date.now()}`;
+    const actualPaymentDate = data.proofOfPayment && data.proofOfPayment.length > 0 ? new Date().toISOString().split('T')[0] : undefined;
+
+    const newBillEntry: BillPayment = {
+        id: newPaymentId,
+        tenantId: data.tenantId,
+        tenantName: tenantDetails?.name || 'Unknown Tenant',
+        unitNumber: tenantDetails?.unitNumber || 'N/A',
+        buildingName: tenantDetails?.buildingName || 'N/A',
+        billType: data.billType,
+        amount: data.amount,
+        dueDate: data.billDueDate,
+        paymentDate: actualPaymentDate,
+        proofOfPaymentUrl: data.proofOfPayment && data.proofOfPayment.length > 0 ? `mock_proof_for_${newPaymentId}.pdf` : undefined,
+        status: 'pending', 
+        adminNotes: data.notes || '',
+        isOverdue: new Date(data.billDueDate) < new Date() && !actualPaymentDate,
+    };
+
+    onPaymentLogged(newBillEntry);
+
     toast({ 
-        title: "Submission Successful (Mock)", 
-        description: "Bill payment has been logged/submitted." 
+        title: "Submission Successful", 
+        description: "Bill/payment has been logged and is pending approval." 
     });
     form.reset();
     setIsLoading(false);
@@ -108,7 +119,7 @@ function BillPaymentForm() {
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="font-headline">Upload Bill Payment / Log Bill</CardTitle>
-        <CardDescription>Submit proof of payment or log a new bill for a tenant.</CardDescription>
+        <CardDescription>Submit proof of payment or log a new bill for a tenant. New entries will require approval.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}>
@@ -169,10 +180,10 @@ function BillPaymentForm() {
               />
               <FormField
                 control={form.control}
-                name="paymentDate"
+                name="billDueDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Due Date / Payment Date</FormLabel>
+                    <FormLabel>Bill Due Date (YYYY-MM-DD)</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
@@ -235,19 +246,24 @@ function BillPaymentForm() {
   );
 }
 
-function ApprovalQueueTable({ payments }: { payments: BillPayment[] }) {
+interface ApprovalQueueTableProps {
+  payments: BillPayment[];
+  onUpdatePaymentStatus: (paymentId: string, status: 'approved' | 'rejected', notes?: string) => void;
+}
+
+function ApprovalQueueTable({ payments, onUpdatePaymentStatus }: ApprovalQueueTableProps) {
   const { toast } = useToast();
   const pendingApproval = payments.filter(p => p.status === 'pending');
 
   const handleApprove = (paymentId: string) => {
-    console.log("Approve payment:", paymentId);
-    toast({ title: "Payment Approved (Mock)", description: `Payment ID ${paymentId} marked as approved.` });
-    // Add logic to update payment status in mockData or state if needed for UI feedback
+    onUpdatePaymentStatus(paymentId, 'approved');
+    toast({ title: "Payment Approved", description: `Payment ID ${paymentId} marked as approved.` });
   };
   const handleReject = (paymentId: string) => {
-    console.log("Reject payment:", paymentId);
-    toast({ title: "Payment Rejected (Mock)", description: `Payment ID ${paymentId} marked as rejected.` });
-    // Add logic to update payment status
+    // Potentially open a dialog here to get rejection reason
+    const reason = prompt("Reason for rejection (optional):");
+    onUpdatePaymentStatus(paymentId, 'rejected', reason || "Rejected via UI.");
+    toast({ title: "Payment Rejected", description: `Payment ID ${paymentId} marked as rejected.` });
   };
 
   return (
@@ -263,7 +279,7 @@ function ApprovalQueueTable({ payments }: { payments: BillPayment[] }) {
                 <TableHead>Tenant</TableHead>
                 <TableHead>Bill Type</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Due Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -309,6 +325,7 @@ function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
                 <TableHead>Bill Type</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Due Date</TableHead>
+                <TableHead>Payment Date</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -322,13 +339,15 @@ function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
                   <TableCell>{payment.billType.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</TableCell>
                   <TableCell>${payment.amount.toLocaleString()}</TableCell>
                   <TableCell>{format(new Date(payment.dueDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>{payment.paymentDate ? format(new Date(payment.paymentDate), 'MMM d, yyyy') : 'N/A'}</TableCell>
                   <TableCell>
                     <Badge variant={
                       payment.status === 'approved' || payment.status === 'paid' ? 'default' : 
                       payment.status === 'pending' ? 'secondary' : 'destructive'
                     } className={
                        payment.status === 'approved' || payment.status === 'paid' ? 'bg-green-100 text-green-700 border-green-300' :
-                       payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''
+                       payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 
+                       payment.status === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' : ''
                     }>
                       {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
                     </Badge>
@@ -417,7 +436,19 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
 export default function PaymentsPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
-  console.log("PaymentsPage rendering, initialTab:", initialTab);
+  const [dynamicBillPayments, setDynamicBillPayments] = React.useState<BillPayment[]>(mockBillPayments);
+
+  const handlePaymentLogged = (newPayment: BillPayment) => {
+    setDynamicBillPayments(prevPayments => [newPayment, ...prevPayments]);
+  };
+
+  const handleUpdatePaymentStatus = (paymentId: string, status: 'approved' | 'rejected', notes?: string) => {
+    setDynamicBillPayments(prevPayments =>
+      prevPayments.map(p =>
+        p.id === paymentId ? { ...p, status, adminNotes: notes || p.adminNotes } : p
+      )
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -440,13 +471,13 @@ export default function PaymentsPage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <BillPaymentForm />
+          <BillPaymentForm onPaymentLogged={handlePaymentLogged} />
         </TabsContent>
         <TabsContent value="approval">
-          <ApprovalQueueTable payments={mockBillPayments} />
+          <ApprovalQueueTable payments={dynamicBillPayments} onUpdatePaymentStatus={handleUpdatePaymentStatus} />
         </TabsContent>
          <TabsContent value="all_payments">
-          <AllPaymentsTable payments={mockBillPayments} />
+          <AllPaymentsTable payments={dynamicBillPayments} />
         </TabsContent>
         <TabsContent value="bounced">
           <BouncedChecksTable checks={mockBouncedChecks} />
@@ -455,4 +486,3 @@ export default function PaymentsPage() {
     </div>
   );
 }
-
