@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { mockTenants, mockBillPayments } from '@/lib/mockData';
-import type { BillPayment, Tenant } from '@/lib/types'; // Ensure Tenant is imported
+import type { BillPayment, Tenant } from '@/lib/types';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -28,7 +28,7 @@ const paymentUploadFormSchema = z.object({
       "Proof of payment (file) is required."
     )
     .refine(
-      (value) => typeof window === 'undefined' || (value instanceof FileList && value.length > 0 && value[0].size <= 5 * 1024 * 1024),
+      (value) => typeof window === 'undefined' || (value instanceof FileList && value.length > 0 && value[0].size <= 5 * 1024 * 1024), // 5MB limit
       "File size must be 5MB or less."
     ),
   notes: z.string().optional(),
@@ -41,7 +41,7 @@ export default function TenantPaymentUploadPage() {
   const [isLoading, setIsLoading] = React.useState(false);
 
   // Simulate fetching the logged-in tenant. In a real app, this would come from auth.
-  const tenant: Tenant | undefined = mockTenants[0]; 
+  const tenant: Tenant | undefined = mockTenants[0];
 
   const tenantUnpaidBills: BillPayment[] = tenant
     ? mockBillPayments.filter(bill => bill.tenantId === tenant.id && (bill.status === 'pending' || bill.status === 'rejected' || !bill.paymentDate))
@@ -72,7 +72,7 @@ export default function TenantPaymentUploadPage() {
     setIsLoading(false);
   };
 
-  const onInvalidSubmit = (errors: any) => {
+  const onInvalidSubmit = (errors: FieldErrors<PaymentUploadFormValues>) => {
     console.error("Tenant Payment Upload Validation Errors:", errors);
     toast({
         variant: "destructive",
@@ -81,14 +81,17 @@ export default function TenantPaymentUploadPage() {
     });
   };
 
-
   if (!tenant) {
     return (
-         <div className="space-y-6">
-            <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
-            <Card><CardContent className="p-6 text-center text-muted-foreground">Could not load tenant information. Please try again.</CardContent></Card>
-        </div>
-    ); // Critical: Ensure this return statement is properly terminated.
+      <div className="space-y-6">
+        <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            Could not load tenant information. Please try again.
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
