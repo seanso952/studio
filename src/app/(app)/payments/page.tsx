@@ -37,7 +37,7 @@ const billPaymentFormSchema = z.object({
         if (typeof FileList !== 'undefined') {
           if (!(value instanceof FileList)) return false;
           if (value.length === 0) return true;
-          return value[0].size <= 5 * 1024 * 1024; 
+          return value[0].size <= 5 * 1024 * 1024;
         }
         return false;
       },
@@ -63,7 +63,7 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
     defaultValues: {
       tenantId: '',
       billType: undefined,
-      amount: undefined,
+      amount: '' as unknown as number, // Changed from undefined
       billDueDate: '',
       proofOfPayment: null,
       notes: '',
@@ -73,7 +73,7 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
     console.log("Form submitted successfully with data:", data);
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const tenantDetails = mockTenants.find(t => t.id === data.tenantId);
     const newPaymentId = `bill-${Date.now()}`;
@@ -90,16 +90,16 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
         dueDate: data.billDueDate,
         paymentDate: actualPaymentDate,
         proofOfPaymentUrl: data.proofOfPayment && data.proofOfPayment.length > 0 ? `mock_proof_for_${newPaymentId}.pdf` : undefined,
-        status: 'pending', 
+        status: 'pending',
         adminNotes: data.notes || '',
         isOverdue: new Date(data.billDueDate) < new Date() && !actualPaymentDate,
     };
 
     onPaymentLogged(newBillEntry);
 
-    toast({ 
-        title: "Submission Successful", 
-        description: "Bill/payment has been logged and is pending approval." 
+    toast({
+        title: "Submission Successful",
+        description: "Bill/payment has been logged and is pending approval."
     });
     form.reset();
     setIsLoading(false);
@@ -172,7 +172,13 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
                   <FormItem>
                     <FormLabel>Amount</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -199,8 +205,8 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
                     <FormItem>
                     <FormLabel>Proof of Payment (Optional, Max 5MB)</FormLabel>
                     <FormControl>
-                        <Input 
-                        type="file" 
+                        <Input
+                        type="file"
                         accept="image/*,.pdf"
                         onBlur={onBlur}
                         name={name}
@@ -341,11 +347,11 @@ function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
                   <TableCell>{payment.paymentDate ? format(new Date(payment.paymentDate), 'MMM d, yyyy') : 'N/A'}</TableCell>
                   <TableCell>
                     <Badge variant={
-                      payment.status === 'approved' || payment.status === 'paid' ? 'default' : 
+                      payment.status === 'approved' || payment.status === 'paid' ? 'default' :
                       payment.status === 'pending' ? 'secondary' : 'destructive'
                     } className={
                        payment.status === 'approved' || payment.status === 'paid' ? 'bg-green-100 text-green-700 border-green-300' :
-                       payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 
+                       payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' :
                        payment.status === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' : ''
                     }>
                       {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
@@ -391,7 +397,7 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
     defaultValues: {
       tenantId: '',
       checkNumber: '',
-      amount: undefined,
+      amount: '' as unknown as number, // Changed from undefined
       bounceDate: '',
       reason: '',
       status: 'pending_collection',
@@ -419,7 +425,7 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
     form.reset();
     setIsLoading(false);
   };
-  
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -465,7 +471,15 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Amount</FormLabel>
-                    <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -568,7 +582,7 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
     onUpdateStatus(checkId, newStatus);
     toast({ title: "Status Updated", description: `Bounced check ID ${checkId} status updated to ${newStatus.replace('_', ' ')}.` });
   };
-  
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -601,9 +615,9 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
                   <TableCell>{format(new Date(check.bounceDate), 'MMM d, yyyy')}</TableCell>
                   <TableCell>{check.reason}</TableCell>
                   <TableCell>
-                    <Badge variant={check.status === 'resolved' ? 'default' : check.status === 'pending_collection' ? 'secondary' : 'destructive'} 
+                    <Badge variant={check.status === 'resolved' ? 'default' : check.status === 'pending_collection' ? 'secondary' : 'destructive'}
                            className={
-                             check.status === 'resolved' ? 'bg-green-100 text-green-700 border-green-300' : 
+                             check.status === 'resolved' ? 'bg-green-100 text-green-700 border-green-300' :
                              check.status === 'pending_collection' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''
                            }>
                       {check.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -657,7 +671,7 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Payments &amp; Bills" description="Manage tenant billings, payment uploads, approvals, and bounced checks." />
-      
+
       <div className="mb-4 flex gap-2">
         <div className="relative flex-grow">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -694,3 +708,5 @@ export default function PaymentsPage() {
     </div>
   );
 }
+
+    
