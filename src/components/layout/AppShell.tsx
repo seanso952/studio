@@ -40,27 +40,24 @@ import {
   UserSquare,
   ShieldCheck,
   Briefcase,
-  Loader2
+  Loader2,
+  UserCog, // Corrected: Icon for User Management
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCurrentUser, logoutFirebaseUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
 import { auth } from '@/lib/firebaseConfig'; // Import auth
 
-const navItemsAdmin = [
+const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/properties', label: 'Properties', icon: Building2 },
   { href: '/tenants', label: 'Tenants', icon: Users },
   { href: '/payments', label: 'Payments & Bills', icon: CreditCard },
   { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/contract-analysis', label: 'Contract Analysis', icon: FileClock },
 ];
 
-const navItemsManager = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/properties', label: 'My Properties', icon: Building2 },
-  { href: '/tenants', label: 'Tenants', icon: Users },
-  { href: '/payments', label: 'Payments & Bills', icon: CreditCard },
-  { href: '/documents', label: 'Documents', icon: FileText },
+const adminOnlyNavItems = [
+  { href: '/users', label: 'User Management', icon: UserCog }, // Corrected: Use UserCog
+  { href: '/contract-analysis', label: 'Contract Analysis', icon: FileClock },
 ];
 
 
@@ -75,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const unsubscribe = subscribeToUserChanges(() => {
       const user = getCurrentUser();
       setCurrentUserLocal(user);
-      setAuthLoading(false); // Auth state confirmed
+      setAuthLoading(false); 
 
       if (!user && pathname !== '/login') {
         router.push('/login');
@@ -83,12 +80,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
     
     // Initial check in case subscription fires after first render
-    // Check if auth is defined before accessing auth.currentUser
     if (getCurrentUser() === null && typeof window !== 'undefined' && auth && auth.currentUser === null) {
        setAuthLoading(false);
        if (pathname !== '/login') router.push('/login');
     } else if (getCurrentUser() === null && typeof window !== 'undefined' && !auth) {
-      // If auth itself is not defined (due to API key missing), also stop loading and redirect.
       setAuthLoading(false);
       if (pathname !== '/login') router.push('/login');
     }
@@ -99,10 +94,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     await logoutFirebaseUser();
-    // onAuthStateChanged in authStore will push to /login via the useEffect above
   };
 
-  // Simulating role switch for dev by just navigating, actual role comes from logged in user
    const handleRoleSwitchSimulate = (rolePath: string) => {
     if (rolePath === '/portal/dashboard' && currentUser?.role !== 'tenant') {
         alert("Please login with a tenant account (e.g. alice@example.com) to access the tenant portal.");
@@ -115,7 +108,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(rolePath);
   };
   
-  const navItems = currentUser?.role === 'manager' ? navItemsManager : navItemsAdmin;
+  let navItems = navItemsBase;
+  if (currentUser?.role === 'admin') {
+    navItems = [...navItemsBase, ...adminOnlyNavItems];
+  } else if (currentUser?.role === 'manager') {
+    // Manager specific items (currently same as base, properties label changes)
+    navItems = navItemsBase.map(item => item.href === '/properties' ? {...item, label: 'My Properties'} : item);
+  }
+
 
   if (authLoading && pathname !== '/login') {
     return (
@@ -127,7 +127,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!currentUser && pathname !== '/login') {
-    // Should be caught by useEffect, but as a fallback
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <p>Redirecting to login...</p>
@@ -135,18 +134,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // If user is not authenticated and is not on login page, AppShell contents are not rendered
-  // The useEffect above handles the redirect.
-  // If user is authenticated OR is on the login page, render the shell or children.
   if (!currentUser && pathname !== '/login') {
-    return null; // Or a minimal loader, but redirect should handle it
+    return null; 
   }
 
 
   return (
     <SidebarProvider defaultOpen>
       <div className="flex min-h-screen">
-        {currentUser && pathname !== '/login' && ( // Only show sidebar if logged in and not on login page
+        {currentUser && pathname !== '/login' && ( 
           <Sidebar variant="sidebar" collapsible="icon" className="border-r">
             <SidebarHeader className="p-4 flex items-center gap-2">
               <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
@@ -221,19 +217,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <SidebarInset className={cn(
             "flex-1 flex flex-col",
-            (!currentUser || pathname === '/login') ? "bg-muted/40" : "bg-background" // Full width if not logged in or on login page
+            (!currentUser || pathname === '/login') ? "bg-muted/40" : "bg-background" 
         )}>
-          {currentUser && pathname !== '/login' && ( // Only show header if logged in and not on login page
+          {currentUser && pathname !== '/login' && ( 
             <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-card px-6 shadow-sm">
               <SidebarTrigger className="md:hidden" />
               <div className="flex-1">
-                {/* Could add breadcrumbs or page title here */}
               </div>
             </header>
           )}
           <main className={cn(
             "flex-1 overflow-y-auto",
-            (currentUser && pathname !== '/login') ? "p-4 md:p-6 lg:p-8" : "" // No padding if login page
+            (currentUser && pathname !== '/login') ? "p-4 md:p-6 lg:p-8" : "" 
             )}>
             {children}
           </main>

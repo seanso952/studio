@@ -98,13 +98,17 @@ export interface DocumentSummary {
   url: string;
 }
 
-export type UserRole = 'admin' | 'manager' | 'tenant' | null; // null for unauthenticated
+export type UserRole = 'admin' | 'manager' | 'tenant' | null; // null for unauthenticated or undefined role
 
 export interface MockAuthUser {
-  id: string; // Firebase UID
+  id: string; // Firebase UID or mock ID
   name: string;
   email?: string | null;
   role: UserRole;
   assignedBuildingIds?: string[]; // For managers
   firebaseUser?: FirebaseUser | null; // Store the actual Firebase user object
 }
+
+// For displaying users in user management, can be similar to MockAuthUser
+export interface DisplayUser extends MockAuthUser {}
+
