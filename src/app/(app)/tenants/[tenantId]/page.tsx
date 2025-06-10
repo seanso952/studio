@@ -1,7 +1,9 @@
+
 'use client';
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,9 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockTenants, mockBillPayments, mockUnits, mockBuildings } from '@/lib/mockData';
+import { getTenantById, subscribeToTenants } from '@/lib/tenantStore';
+import { mockBillPayments, mockUnits, mockBuildings } from '@/lib/mockData'; // BillPayments still from mock for now
 import type { Tenant, BillPayment } from '@/lib/types';
-import { ArrowLeft, Edit3, Mail, Phone, FileText, DollarSign, PlusCircle, AlertTriangle, BadgeCent, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Edit3, Mail, Phone, FileText, DollarSign, PlusCircle, AlertTriangle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -19,10 +22,23 @@ import { Badge } from '@/components/ui/badge';
 export default function TenantProfilePage() {
   const params = useParams();
   const tenantId = params.tenantId as string;
-  const tenant = mockTenants.find(t => t.id === tenantId);
+  
+  const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantId));
+
+  React.useEffect(() => {
+    const updateTenant = () => setTenant(getTenantById(tenantId));
+    updateTenant(); 
+
+    const unsubscribe = subscribeToTenants(updateTenant);
+    return () => unsubscribe();
+  }, [tenantId]);
+
+
+  // Note: BillPayments, Units, Buildings are still from mockData for this specific page's deeper details.
+  // This would need further refactoring if those also need to be fully dynamic based on stores.
   const paymentsForTenant = mockBillPayments.filter(p => p.tenantId === tenantId);
-  const unit = mockUnits.find(u => u.id === tenant?.unitId);
-  const building = mockBuildings.find(b => b.id === unit?.buildingId);
+  const unit = tenant ? mockUnits.find(u => u.id === tenant.unitId) : undefined; // Use tenant from store
+  const building = unit ? mockBuildings.find(b => b.id === unit.buildingId) : undefined;
 
 
   if (!tenant) {
@@ -68,7 +84,7 @@ export default function TenantProfilePage() {
             </Avatar>
             <CardTitle className="font-headline text-2xl">{tenant.name}</CardTitle>
             <CardDescription>
-              {unit && building ? `${unit.unitNumber}, ${building.name}` : 'No unit assigned'}
+              {tenant.unitNumber && tenant.buildingName ? `${tenant.unitNumber}, ${tenant.buildingName}` : 'No unit assigned'}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm space-y-3">

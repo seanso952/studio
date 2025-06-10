@@ -1,18 +1,30 @@
+
 'use client';
 
 import Link from 'next/link';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { mockTenants } from '@/lib/mockData';
+import { getTenants, subscribeToTenants } from '@/lib/tenantStore';
 import type { Tenant } from '@/lib/types';
 import { PlusCircle, MoreHorizontal, FileText, MessageSquare, Phone, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function TenantsPage() {
+  const [tenants, setTenants] = React.useState<Tenant[]>(() => getTenants());
+
+  React.useEffect(() => {
+    const updateTenants = () => setTenants(getTenants());
+    updateTenants(); // Initial fetch
+
+    const unsubscribe = subscribeToTenants(updateTenants);
+    return () => unsubscribe();
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader title="Tenants" description="Manage all tenants and their information.">
@@ -25,11 +37,11 @@ export default function TenantsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline">All Tenants ({mockTenants.length})</CardTitle>
+          <CardTitle className="font-headline">All Tenants ({tenants.length})</CardTitle>
           <CardDescription>A list of all tenants across your properties.</CardDescription>
         </CardHeader>
         <CardContent>
-          {mockTenants.length > 0 ? (
+          {tenants.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -43,12 +55,14 @@ export default function TenantsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockTenants.map((tenant) => {
+                {tenants.map((tenant) => {
                   const contractEndDate = new Date(tenant.contractEndDate);
                   const today = new Date();
-                  const isNearExpiry = contractEndDate > today && contractEndDate.setMonth(contractEndDate.getMonth() - 2) <= today.setMonth(today.getMonth());
-                  contractEndDate.setMonth(contractEndDate.getMonth() + 2); // Reset date for display
-                  const isExpired = new Date(tenant.contractEndDate) < new Date();
+                  // Check if contract ends within the next 2 months for "Near Expiry"
+                  const twoMonthsFromNow = new Date();
+                  twoMonthsFromNow.setMonth(today.getMonth() + 2);
+                  const isNearExpiry = contractEndDate > today && contractEndDate <= twoMonthsFromNow;
+                  const isExpired = contractEndDate < today;
 
 
                   let statusVariant: "default" | "secondary" | "destructive" | "outline" = "default";
@@ -57,7 +71,7 @@ export default function TenantsPage() {
                     statusVariant = "destructive";
                     statusText = "Expired";
                   } else if (isNearExpiry) {
-                    statusVariant = "outline"; // Visually distinct, often yellow/orange in themes
+                    statusVariant = "outline";
                     statusText = "Near Expiry";
                   }
 
@@ -117,7 +131,7 @@ export default function TenantsPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center py-4">No tenants found.</p>
+            <p className="text-muted-foreground text-center py-4">No tenants found. Add your first tenant to get started.</p>
           )}
         </CardContent>
       </Card>

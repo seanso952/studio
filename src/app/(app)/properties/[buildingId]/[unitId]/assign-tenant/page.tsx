@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { getBuildings } from '@/lib/propertyStore';
-import { getUnitsByBuildingId, assignTenantToUnit as assignTenantToUnitInStore } from '@/lib/unitStore';
-import { mockTenants } from '@/lib/mockData'; // We'll directly modify this for now
+import { getUnitsByBuildingId, assignTenantToUnit as assignTenantToUnitInStore, subscribeToUnits } from '@/lib/unitStore';
+import { getTenants, updateTenantInStore, subscribeToTenants } from '@/lib/tenantStore';
 import type { Building, Tenant, Unit } from '@/lib/types';
 import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
 
@@ -35,16 +35,32 @@ export default function AssignTenantPage() {
 
   const [building, setBuilding] = React.useState<Building | undefined>(undefined);
   const [unit, setUnit] = React.useState<Unit | undefined>(undefined);
+  const [availableTenants, setAvailableTenants] = React.useState<Tenant[]>([]);
 
   React.useEffect(() => {
     const allBuildings = getBuildings();
     setBuilding(allBuildings.find(b => b.id === buildingId));
 
-    const unitsInBuilding = getUnitsByBuildingId(buildingId);
-    setUnit(unitsInBuilding.find(u => u.id === unitId));
+    const updateUnitDetails = () => {
+        const unitsInBuilding = getUnitsByBuildingId(buildingId);
+        setUnit(unitsInBuilding.find(u => u.id === unitId));
+    };
+    updateUnitDetails();
+    const unsubscribeUnits = subscribeToUnits(updateUnitDetails);
+
+    const updateAvailableTenants = () => {
+        const allTenants = getTenants();
+        setAvailableTenants(allTenants.filter(tenant => !tenant.unitId));
+    };
+    updateAvailableTenants();
+    const unsubscribeTenants = subscribeToTenants(updateAvailableTenants);
+    
+    return () => {
+        unsubscribeUnits();
+        unsubscribeTenants();
+    };
   }, [buildingId, unitId]);
 
-  const availableTenants = mockTenants.filter(tenant => !tenant.unitId);
 
   const form = useForm<AssignTenantFormValues>({
     resolver: zodResolver(assignTenantFormSchema),
@@ -64,7 +80,8 @@ export default function AssignTenantPage() {
     }
 
     setIsLoading(true);
-    const selectedTenant = mockTenants.find(t => t.id === data.tenantId);
+    const allTenants = getTenants(); // Get fresh list
+    const selectedTenant = allTenants.find(t => t.id === data.tenantId);
 
     if (!selectedTenant) {
       toast({ variant: "destructive", title: "Error", description: "Selected tenant not found." });
@@ -84,13 +101,14 @@ export default function AssignTenantPage() {
       // 1. Update unit in unitStore
       assignTenantToUnitInStore(unit.id, selectedTenant);
 
-      // 2. Update tenant in mockTenants (direct mutation for now)
-      const tenantIndex = mockTenants.findIndex(t => t.id === selectedTenant.id);
-      if (tenantIndex > -1) {
-        mockTenants[tenantIndex].unitId = unit.id;
-        mockTenants[tenantIndex].unitNumber = unit.unitNumber;
-        mockTenants[tenantIndex].buildingName = building.name;
-      }
+      // 2. Update tenant in tenantStore
+      const updatedTenantData: Tenant = {
+        ...selectedTenant,
+        unitId: unit.id,
+        unitNumber: unit.unitNumber,
+        buildingName: building.name,
+      };
+      updateTenantInStore(updatedTenantData);
       
       toast({
         title: "Tenant Assigned",
