@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { useForm, type SubmitHandler, type SubmitErrorHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -57,6 +57,7 @@ function BillPaymentForm() {
   });
 
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
+    console.log("Form submitted successfully with data:", data); // Log successful submission
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -65,11 +66,21 @@ function BillPaymentForm() {
         console.log("Proof of payment file:", data.proofOfPayment[0].name);
     }
     toast({ 
-        title: "Submission Successful", 
+        title: "Submission Successful (Mock)", 
         description: "Bill payment has been logged/submitted." 
     });
     form.reset();
     setIsLoading(false);
+  };
+
+  const onInvalidSubmit: SubmitErrorHandler<BillPaymentFormValues> = (errors) => {
+    console.error("Form validation failed:", errors);
+    const errorMessages = Object.values(errors).map(e => e.message).filter(Boolean).join(' ');
+    toast({
+      variant: "destructive",
+      title: "Validation Error",
+      description: `Please check the form for errors. ${errorMessages || 'See console for details.'}`,
+    });
   };
 
   return (
@@ -79,7 +90,7 @@ function BillPaymentForm() {
         <CardDescription>Submit proof of payment or log a new bill for a tenant.</CardDescription>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalidSubmit)}> {/* Updated handleSubmit */}
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -385,6 +396,7 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
 export default function PaymentsPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
+  console.log("PaymentsPage rendering, initialTab:", initialTab);
 
   return (
     <div className="space-y-6">
