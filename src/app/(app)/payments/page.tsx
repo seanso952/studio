@@ -1,0 +1,269 @@
+'use client';
+
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { mockBillPayments, mockBouncedChecks, mockTenants } from '@/lib/mockData';
+import type { BillPayment, BouncedCheck, BillType } from '@/lib/types';
+import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter } from 'lucide-react';
+import { format } from 'date-fns';
+import { useSearchParams } from 'next/navigation';
+
+function BillPaymentForm() {
+  // Basic form structure, can be enhanced with react-hook-form
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="font-headline">Upload Bill Payment / Log Bill</CardTitle>
+        <CardDescription>Submit proof of payment or log a new bill for a tenant.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="tenantSelect">Tenant</Label>
+            <Select>
+              <SelectTrigger id="tenantSelect"><SelectValue placeholder="Select Tenant" /></SelectTrigger>
+              <SelectContent>
+                {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="billType">Bill Type</Label>
+            <Select>
+              <SelectTrigger id="billType"><SelectValue placeholder="Select Bill Type" /></SelectTrigger>
+              <SelectContent>
+                {(['rent', 'electricity', 'water', 'association_dues', 'other'] as BillType[]).map(type => (
+                  <SelectItem key={type} value={type}>{type.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="amount">Amount</Label>
+            <Input id="amount" type="number" placeholder="0.00" />
+          </div>
+          <div>
+            <Label htmlFor="dueDate">Due Date / Payment Date</Label>
+            <Input id="dueDate" type="date" />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="proofOfPayment">Proof of Payment (Optional)</Label>
+          <Input id="proofOfPayment" type="file" />
+        </div>
+        <div>
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Textarea id="notes" placeholder="Any relevant notes..." />
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button><Upload className="mr-2 h-4 w-4" /> Submit Payment / Log Bill</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function ApprovalQueueTable({ payments }: { payments: BillPayment[] }) {
+  const pendingApproval = payments.filter(p => p.status === 'pending');
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="font-headline">Pending Approvals ({pendingApproval.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {pendingApproval.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tenant</TableHead>
+                <TableHead>Bill Type</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendingApproval.map(payment => (
+                <TableRow key={payment.id}>
+                  <TableCell>
+                    {payment.tenantName || 'N/A'}
+                    <p className="text-xs text-muted-foreground">{payment.buildingName} - {payment.unitNumber}</p>
+                  </TableCell>
+                  <TableCell>{payment.billType.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</TableCell>
+                  <TableCell>${payment.amount.toLocaleString()}</TableCell>
+                  <TableCell>{format(new Date(payment.dueDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell className="text-right space-x-2">
+                    {payment.proofOfPaymentUrl && <Button variant="outline" size="sm" asChild><a href={payment.proofOfPaymentUrl} target="_blank" rel="noopener noreferrer">View Proof</a></Button>}
+                    <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700"><CheckCircle className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700"><XCircle className="h-5 w-5" /></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">No payments pending approval.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
+ return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="font-headline">All Payments &amp; Bills ({payments.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {payments.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tenant</TableHead>
+                <TableHead>Bill Type</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map(payment => (
+                <TableRow key={payment.id}>
+                  <TableCell>
+                    {payment.tenantName || 'N/A'}
+                    <p className="text-xs text-muted-foreground">{payment.buildingName} - {payment.unitNumber}</p>
+                  </TableCell>
+                  <TableCell>{payment.billType.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</TableCell>
+                  <TableCell>${payment.amount.toLocaleString()}</TableCell>
+                  <TableCell>{format(new Date(payment.dueDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      payment.status === 'approved' || payment.status === 'paid' ? 'default' : 
+                      payment.status === 'pending' ? 'secondary' : 'destructive'
+                    } className={
+                       payment.status === 'approved' || payment.status === 'paid' ? 'bg-green-100 text-green-700 border-green-300' :
+                       payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''
+                    }>
+                      {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">No payments or bills logged yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="font-headline">Bounced Checks ({checks.length})</CardTitle>
+        <CardDescription>Track and manage bounced checks from tenants.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {checks.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tenant</TableHead>
+                <TableHead>Check #</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Bounce Date</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {checks.map(check => (
+                <TableRow key={check.id}>
+                  <TableCell>
+                    {check.tenantName || 'N/A'}
+                     <p className="text-xs text-muted-foreground">{check.buildingName} - {check.unitNumber}</p>
+                  </TableCell>
+                  <TableCell>{check.checkNumber}</TableCell>
+                  <TableCell>${check.amount.toLocaleString()}</TableCell>
+                  <TableCell>{format(new Date(check.bounceDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>{check.reason}</TableCell>
+                  <TableCell>
+                    <Badge variant={check.status === 'resolved' ? 'default' : 'destructive'} className={check.status === 'resolved' ? 'bg-green-100 text-green-700 border-green-300' : ''}>
+                      {check.status.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm">Update Status</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">No bounced checks recorded.</p>
+        )}
+      </CardContent>
+      <CardFooter>
+        <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Log Bounced Check</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+export default function PaymentsPage() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'overview';
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Payments &amp; Bills" description="Manage tenant billings, payment uploads, approvals, and bounced checks." />
+      
+      <div className="mb-4 flex gap-2">
+        <div className="relative flex-grow">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input type="search" placeholder="Search payments or tenants..." className="pl-8 w-full" />
+        </div>
+        <Button variant="outline"><Filter className="mr-2 h-4 w-4"/>Filter</Button>
+      </div>
+
+      <Tabs defaultValue={initialTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-4">
+          <TabsTrigger value="overview">Overview &amp; Upload</TabsTrigger>
+          <TabsTrigger value="approval">Approval Queue</TabsTrigger>
+          <TabsTrigger value="all_payments">All Payments</TabsTrigger>
+          <TabsTrigger value="bounced">Bounced Checks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <BillPaymentForm />
+        </TabsContent>
+        <TabsContent value="approval">
+          <ApprovalQueueTable payments={mockBillPayments} />
+        </TabsContent>
+         <TabsContent value="all_payments">
+          <AllPaymentsTable payments={mockBillPayments} />
+        </TabsContent>
+        <TabsContent value="bounced">
+          <BouncedChecksTable checks={mockBouncedChecks} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
