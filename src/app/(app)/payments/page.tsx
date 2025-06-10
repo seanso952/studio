@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useForm, type SubmitHandler, type SubmitErrorHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,7 +21,6 @@ import { mockBillPayments, mockBouncedChecks as initialMockBouncedChecks, mockTe
 import type { BillPayment, BouncedCheck, BillType } from '@/lib/types';
 import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useSearchParams } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 
 const billTypeValues = ['rent', 'electricity', 'water', 'association_dues', 'other'] as const;
@@ -63,7 +63,7 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
     defaultValues: {
       tenantId: '',
       billType: undefined,
-      amount: '' as unknown as number, // Changed from undefined
+      amount: '' as unknown as number,
       billDueDate: '',
       proofOfPayment: null,
       notes: '',
@@ -397,7 +397,7 @@ function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
     defaultValues: {
       tenantId: '',
       checkNumber: '',
-      amount: '' as unknown as number, // Changed from undefined
+      amount: '' as unknown as number,
       bounceDate: '',
       reason: '',
       status: 'pending_collection',
@@ -571,11 +571,8 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
   const { toast } = useToast();
 
   const handleUpdateBouncedCheckStatus = (checkId: string) => {
-    // For simplicity, cycle through statuses or open a select dialog
-    // This is a mock update
     const currentCheck = checks.find(c => c.id === checkId);
     if (!currentCheck) return;
-    // Example: Cycle status (very basic)
     const currentIndex = bouncedCheckStatusValues.indexOf(currentCheck.status);
     const nextIndex = (currentIndex + 1) % bouncedCheckStatusValues.length;
     const newStatus = bouncedCheckStatusValues[nextIndex];
@@ -638,7 +635,7 @@ function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps)
   );
 }
 
-export default function PaymentsPage() {
+function PaymentsPageContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
   const [dynamicBillPayments, setDynamicBillPayments] = React.useState<BillPayment[]>(mockBillPayments);
@@ -709,4 +706,14 @@ export default function PaymentsPage() {
   );
 }
 
-    
+export default function PaymentsPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-[calc(100vh-theme(spacing.14))] w-full items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    }>
+      <PaymentsPageContent />
+    </React.Suspense>
+  );
+}
