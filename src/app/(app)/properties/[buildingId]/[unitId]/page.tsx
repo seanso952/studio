@@ -3,14 +3,16 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { getBuildings } from '@/lib/propertyStore'; // Changed from mockData
-import { mockUnits, mockTenants, mockRepairs } from '@/lib/mockData'; // Units, tenants, repairs still from mockData
+import { getBuildings } from '@/lib/propertyStore'; 
+import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; // Using unitStore
+import { mockTenants, mockRepairs } from '@/lib/mockData'; // Tenants, repairs still from mockData
 import type { Unit, Tenant, Repair } from '@/lib/types';
 import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -22,26 +24,59 @@ export default function UnitDetailsPage() {
   const unitId = params.unitId as string;
   const { toast } = useToast();
 
-  const unit = mockUnits.find(u => u.id === unitId && u.buildingId === buildingId);
+  const [unit, setUnit] = React.useState<Unit | undefined>(undefined);
   
   const allBuildings = getBuildings();
   const building = allBuildings.find(b => b.id === buildingId);
   
-  const tenant = unit?.tenantId ? mockTenants.find(t => t.id === unit.tenantId) : undefined;
-  const repairsForUnit = mockRepairs.filter(r => r.unitId === unitId);
+  React.useEffect(() => {
+    if (!buildingId || !unitId) return;
 
-  if (!unit || !building) {
+    const updateUnit = () => {
+      const unitsInBuilding = getUnitsByBuildingId(buildingId);
+      const currentUnit = unitsInBuilding.find(u => u.id === unitId);
+      setUnit(currentUnit);
+    };
+
+    updateUnit(); // Initial fetch
+
+    const unsubscribe = subscribeToUnits(updateUnit); // Subscribe to all unit changes for simplicity
+    return () => unsubscribe();
+  }, [buildingId, unitId]);
+
+
+  // Tenant and repairs are still derived from mockData for now, or from the unit object if populated
+  const tenant = unit?.tenantId ? mockTenants.find(t => t.id === unit.tenantId) : (unit?.tenant);
+  const repairsForUnit = unit ? (unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId)) : [];
+
+
+  if (!building) { // Check for building first
     return (
       <div className="text-center py-10">
-        <h2 className="text-2xl font-semibold">Unit or Building not found</h2>
+        <h2 className="text-2xl font-semibold">Building not found</h2>
         <Button asChild variant="link" className="mt-4">
-          <Link href={`/properties/${buildingId || ''}`}>
+          <Link href={`/properties`}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Properties
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+  
+  // Separate check for unit after building is confirmed
+  if (!unit) {
+     return (
+      <div className="text-center py-10">
+        <h2 className="text-2xl font-semibold">Unit not found</h2>
+        <Button asChild variant="link" className="mt-4">
+          <Link href={`/properties/${buildingId}`}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Building
           </Link>
         </Button>
       </div>
     );
   }
+
 
   const handleLogRepair = () => {
     console.log("Log Repair clicked for unit:", unitId);

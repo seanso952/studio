@@ -4,13 +4,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { getBuildings } from '@/lib/propertyStore'; // Changed from mockData
-import { mockUnits } from '@/lib/mockData'; // Units still from mockData for now
+import { getBuildings } from '@/lib/propertyStore';
+import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; // Import unit store functions
 import type { Building, Unit } from '@/lib/types';
 import { ArrowLeft, PlusCircle, Home, Users, BedDouble, Bath, DollarSign, Wrench } from 'lucide-react';
 
@@ -19,13 +20,13 @@ function UnitCard({ unit, buildingName }: { unit: Unit; buildingName: string }) 
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-200">
       <CardHeader>
         <CardTitle className="font-headline text-lg">Unit {unit.unitNumber}</CardTitle>
-        <CardDescription>{unit.status === 'occupied' ? `Occupied by ${unit.tenant?.name}` : 'Vacant'}</CardDescription>
+        <CardDescription>{unit.status === 'occupied' ? `Occupied by ${unit.tenant?.name || 'N/A'}` : 'Vacant'}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <div className="flex items-center"><BedDouble className="h-4 w-4 mr-2 text-muted-foreground" /> {unit.bedrooms} Bedrooms</div>
         <div className="flex items-center"><Bath className="h-4 w-4 mr-2 text-muted-foreground" /> {unit.bathrooms} Bathrooms</div>
         <div className="flex items-center"><Home className="h-4 w-4 mr-2 text-muted-foreground" /> {unit.size}</div>
-        <div className="flex items-center"><DollarSign className="h-4 w-4 mr-2 text-muted-foreground" /> ${unit.monthlyRent}/month</div>
+        <div className="flex items-center"><DollarSign className="h-4 w-4 mr-2 text-muted-foreground" /> ${unit.monthlyRent.toLocaleString()}/month</div>
       </CardContent>
       <CardFooter>
         <Button asChild variant="outline" className="w-full">
@@ -44,7 +45,23 @@ export default function BuildingDetailsPage() {
   const allBuildings = getBuildings();
   const building = allBuildings.find(b => b.id === buildingId);
   
-  const unitsInBuilding = mockUnits.filter(u => u.buildingId === buildingId);
+  const [unitsInBuilding, setUnitsInBuilding] = React.useState<Unit[]>(() => 
+    buildingId ? getUnitsByBuildingId(buildingId) : []
+  );
+
+  React.useEffect(() => {
+    if (!buildingId) return;
+
+    const updateUnits = () => {
+      setUnitsInBuilding(getUnitsByBuildingId(buildingId));
+    };
+    
+    updateUnits(); // Initial fetch
+
+    const unsubscribe = subscribeToUnits(updateUnits);
+    return () => unsubscribe();
+  }, [buildingId]);
+
 
   if (!building) {
     return (
@@ -74,7 +91,7 @@ export default function BuildingDetailsPage() {
 
       <Card className="shadow-lg">
         <CardHeader className="relative h-64 md:h-80 rounded-t-lg overflow-hidden p-0">
-           <Image src={building.imageUrl || 'https://placehold.co/1200x400.png'} alt={building.name} layout="fill" objectFit="cover" data-ai-hint="building panoramic" />
+           <Image src={building.imageUrl || 'https://placehold.co/1200x400.png'} alt={building.name} layout="fill" objectFit="cover" data-ai-hint="building panoramic"/>
            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
            <div className="absolute bottom-0 left-0 p-6">
              <h2 className="text-3xl font-headline font-bold text-white shadow-text">{building.name}</h2>
@@ -85,7 +102,7 @@ export default function BuildingDetailsPage() {
           <div className="grid md:grid-cols-3 gap-6 mb-6">
             <div className="p-4 bg-muted rounded-lg">
               <h3 className="text-sm font-medium text-muted-foreground">Total Units</h3>
-              <p className="text-2xl font-semibold font-headline">{building.numberOfUnits}</p>
+              <p className="text-2xl font-semibold font-headline">{unitsInBuilding.length}</p> {/* Changed from building.numberOfUnits */}
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <h3 className="text-sm font-medium text-muted-foreground">Occupancy</h3>
@@ -121,7 +138,7 @@ export default function BuildingDetailsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center py-4">No units found for this building.</p>
+                <p className="text-muted-foreground text-center py-4">No units found for this building. Click 'Add Unit' to get started.</p>
               )}
             </TabsContent>
             <TabsContent value="financials">
