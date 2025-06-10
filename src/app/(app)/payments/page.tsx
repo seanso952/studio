@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { mockBillPayments, mockBouncedChecks, mockTenants } from '@/lib/mockData';
+import { mockBillPayments, mockBouncedChecks as initialMockBouncedChecks, mockTenants } from '@/lib/mockData';
 import type { BillPayment, BouncedCheck, BillType } from '@/lib/types';
 import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -73,7 +73,7 @@ function BillPaymentForm({ onPaymentLogged }: BillPaymentFormProps) {
   const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
     console.log("Form submitted successfully with data:", data);
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
 
     const tenantDetails = mockTenants.find(t => t.id === data.tenantId);
     const newPaymentId = `bill-${Date.now()}`;
@@ -260,7 +260,6 @@ function ApprovalQueueTable({ payments, onUpdatePaymentStatus }: ApprovalQueueTa
     toast({ title: "Payment Approved", description: `Payment ID ${paymentId} marked as approved.` });
   };
   const handleReject = (paymentId: string) => {
-    // Potentially open a dialog here to get rejection reason
     const reason = prompt("Reason for rejection (optional):");
     onUpdatePaymentStatus(paymentId, 'rejected', reason || "Rejected via UI.");
     toast({ title: "Payment Rejected", description: `Payment ID ${paymentId} marked as rejected.` });
@@ -364,25 +363,216 @@ function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
   );
 }
 
+const bouncedCheckStatusValues = ['pending_collection', 'resolved', 'escalated_to_legal'] as const;
 
-function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
+const bouncedCheckFormSchema = z.object({
+  tenantId: z.string().min(1, "Tenant is required"),
+  checkNumber: z.string().min(1, "Check number is required"),
+  amount: z.coerce.number({invalid_type_error: "Amount must be a number"}).positive("Amount must be positive"),
+  bounceDate: z.string().min(1, "Bounce date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  reason: z.string().min(1, "Reason for bounce is required"),
+  status: z.enum(bouncedCheckStatusValues, { required_error: "Status is required" }),
+  followUpDate: z.string().optional().nullable(),
+  notes: z.string().optional(),
+});
+
+type BouncedCheckFormValues = z.infer<typeof bouncedCheckFormSchema>;
+
+interface BouncedCheckFormProps {
+  onBouncedCheckLogged: (newCheck: BouncedCheck) => void;
+}
+
+function BouncedCheckForm({ onBouncedCheckLogged }: BouncedCheckFormProps) {
+  const [isLoading, setIsLoading] = React.useState(false);
   const { toast } = useToast();
 
-  const handleUpdateBouncedCheckStatus = (checkId: string) => {
-    console.log("Update bounced check status:", checkId);
-    toast({ title: "Status Updated (Mock)", description: `Bounced check ID ${checkId} status updated.` });
-    // Add logic to update status
+  const form = useForm<BouncedCheckFormValues>({
+    resolver: zodResolver(bouncedCheckFormSchema),
+    defaultValues: {
+      tenantId: '',
+      checkNumber: '',
+      amount: undefined,
+      bounceDate: '',
+      reason: '',
+      status: 'pending_collection',
+      followUpDate: '',
+      notes: '',
+    },
+  });
+
+  const onSubmit: SubmitHandler<BouncedCheckFormValues> = async (data) => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const tenantDetails = mockTenants.find(t => t.id === data.tenantId);
+    const newBouncedCheck: BouncedCheck = {
+      id: `bc-${Date.now()}`,
+      tenantId: data.tenantId,
+      tenantName: tenantDetails?.name || 'Unknown Tenant',
+      unitNumber: tenantDetails?.unitNumber || 'N/A',
+      buildingName: tenantDetails?.buildingName || 'N/A',
+      ...data,
+      followUpDate: data.followUpDate || undefined,
+    };
+    onBouncedCheckLogged(newBouncedCheck);
+    toast({ title: "Bounced Check Logged", description: `Check #${data.checkNumber} has been recorded.` });
+    form.reset();
+    setIsLoading(false);
   };
   
-  const handleLogBouncedCheck = () => {
-    console.log("Log Bounced Check clicked");
-    toast({ title: "Action (Mock)", description: "Log Bounced Check form would open here." });
-  };
-
   return (
     <Card className="shadow-md">
       <CardHeader>
-        <CardTitle className="font-headline">Bounced Checks ({checks.length})</CardTitle>
+        <CardTitle className="font-headline">Log New Bounced Check</CardTitle>
+        <CardDescription>Enter the details of the bounced check.</CardDescription>
+      </CardHeader>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="tenantId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tenant</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select Tenant" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="checkNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Check Number</FormLabel>
+                    <FormControl><Input placeholder="e.g., 10023" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="bounceDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bounce Date (YYYY-MM-DD)</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason for Bounce</FormLabel>
+                    <FormControl><Input placeholder="e.g., Insufficient funds" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {bouncedCheckStatusValues.map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="followUpDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Follow-up Date (YYYY-MM-DD, Optional)</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., Called tenant, sent notification..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Logging...</> : <><PlusCircle className="mr-2 h-4 w-4" />Log Bounced Check</>}
+            </Button>
+          </CardFooter>
+        </form>
+      </Form>
+    </Card>
+  );
+}
+
+
+interface BouncedChecksTableProps {
+  checks: BouncedCheck[];
+  onUpdateStatus: (checkId: string, newStatus: BouncedCheck['status']) => void;
+}
+
+function BouncedChecksTable({ checks, onUpdateStatus }: BouncedChecksTableProps) {
+  const { toast } = useToast();
+
+  const handleUpdateBouncedCheckStatus = (checkId: string) => {
+    // For simplicity, cycle through statuses or open a select dialog
+    // This is a mock update
+    const currentCheck = checks.find(c => c.id === checkId);
+    if (!currentCheck) return;
+    // Example: Cycle status (very basic)
+    const currentIndex = bouncedCheckStatusValues.indexOf(currentCheck.status);
+    const nextIndex = (currentIndex + 1) % bouncedCheckStatusValues.length;
+    const newStatus = bouncedCheckStatusValues[nextIndex];
+    onUpdateStatus(checkId, newStatus);
+    toast({ title: "Status Updated", description: `Bounced check ID ${checkId} status updated to ${newStatus.replace('_', ' ')}.` });
+  };
+  
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="font-headline">Recorded Bounced Checks ({checks.length})</CardTitle>
         <CardDescription>Track and manage bounced checks from tenants.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -411,8 +601,12 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
                   <TableCell>{format(new Date(check.bounceDate), 'MMM d, yyyy')}</TableCell>
                   <TableCell>{check.reason}</TableCell>
                   <TableCell>
-                    <Badge variant={check.status === 'resolved' ? 'default' : 'destructive'} className={check.status === 'resolved' ? 'bg-green-100 text-green-700 border-green-300' : ''}>
-                      {check.status.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    <Badge variant={check.status === 'resolved' ? 'default' : check.status === 'pending_collection' ? 'secondary' : 'destructive'} 
+                           className={
+                             check.status === 'resolved' ? 'bg-green-100 text-green-700 border-green-300' : 
+                             check.status === 'pending_collection' ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : ''
+                           }>
+                      {check.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -426,9 +620,6 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
           <p className="text-muted-foreground text-center py-4">No bounced checks recorded.</p>
         )}
       </CardContent>
-      <CardFooter>
-        <Button onClick={handleLogBouncedCheck} variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Log Bounced Check</Button>
-      </CardFooter>
     </Card>
   );
 }
@@ -437,6 +628,7 @@ export default function PaymentsPage() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') || 'overview';
   const [dynamicBillPayments, setDynamicBillPayments] = React.useState<BillPayment[]>(mockBillPayments);
+  const [dynamicBouncedChecks, setDynamicBouncedChecks] = React.useState<BouncedCheck[]>(initialMockBouncedChecks);
 
   const handlePaymentLogged = (newPayment: BillPayment) => {
     setDynamicBillPayments(prevPayments => [newPayment, ...prevPayments]);
@@ -446,6 +638,18 @@ export default function PaymentsPage() {
     setDynamicBillPayments(prevPayments =>
       prevPayments.map(p =>
         p.id === paymentId ? { ...p, status, adminNotes: notes || p.adminNotes } : p
+      )
+    );
+  };
+
+  const handleBouncedCheckLogged = (newCheck: BouncedCheck) => {
+    setDynamicBouncedChecks(prevChecks => [newCheck, ...prevChecks]);
+  };
+
+  const handleUpdateBouncedCheckStatus = (checkId: string, newStatus: BouncedCheck['status']) => {
+     setDynamicBouncedChecks(prevChecks =>
+      prevChecks.map(c =>
+        c.id === checkId ? { ...c, status: newStatus } : c
       )
     );
   };
@@ -463,11 +667,12 @@ export default function PaymentsPage() {
       </div>
 
       <Tabs defaultValue={initialTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-4">
           <TabsTrigger value="overview">Overview &amp; Upload</TabsTrigger>
           <TabsTrigger value="approval">Approval Queue</TabsTrigger>
           <TabsTrigger value="all_payments">All Payments</TabsTrigger>
-          <TabsTrigger value="bounced">Bounced Checks</TabsTrigger>
+          <TabsTrigger value="bounced">Bounced Checks List</TabsTrigger>
+          <TabsTrigger value="log_bounced_check">Log Bounced Check</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -480,7 +685,10 @@ export default function PaymentsPage() {
           <AllPaymentsTable payments={dynamicBillPayments} />
         </TabsContent>
         <TabsContent value="bounced">
-          <BouncedChecksTable checks={mockBouncedChecks} />
+          <BouncedChecksTable checks={dynamicBouncedChecks} onUpdateStatus={handleUpdateBouncedCheckStatus} />
+        </TabsContent>
+        <TabsContent value="log_bounced_check">
+          <BouncedCheckForm onBouncedCheckLogged={handleBouncedCheckLogged} />
         </TabsContent>
       </Tabs>
     </div>

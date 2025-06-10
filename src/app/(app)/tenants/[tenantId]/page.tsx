@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -17,10 +17,13 @@ import type { Tenant, BillPayment } from '@/lib/types';
 import { ArrowLeft, Edit3, Mail, Phone, FileText, DollarSign, PlusCircle, AlertTriangle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 
 export default function TenantProfilePage() {
   const params = useParams();
+  const router = useRouter();
+  const { toast } = useToast();
   const tenantId = params.tenantId as string;
   
   const [tenant, setTenant] = React.useState<Tenant | undefined>(() => getTenantById(tenantId));
@@ -34,10 +37,8 @@ export default function TenantProfilePage() {
   }, [tenantId]);
 
 
-  // Note: BillPayments, Units, Buildings are still from mockData for this specific page's deeper details.
-  // This would need further refactoring if those also need to be fully dynamic based on stores.
   const paymentsForTenant = mockBillPayments.filter(p => p.tenantId === tenantId);
-  const unit = tenant ? mockUnits.find(u => u.id === tenant.unitId) : undefined; // Use tenant from store
+  const unit = tenant ? mockUnits.find(u => u.id === tenant.unitId) : undefined; 
   const building = unit ? mockBuildings.find(b => b.id === unit.buildingId) : undefined;
 
 
@@ -59,12 +60,20 @@ export default function TenantProfilePage() {
   const isNearExpiry = contractEndDate > today && new Date(contractEndDate).setMonth(contractEndDate.getMonth() - 3) <= today.getTime();
   const isExpired = new Date(tenant.contractEndDate) < today;
 
+  const handleAction = (actionName: string, path?: string) => {
+    if (path) {
+      router.push(path);
+    } else {
+      toast({ title: "Action Triggered (Mock)", description: `${actionName} functionality would be here.` });
+    }
+  };
+
 
   return (
     <div className="space-y-6">
       <PageHeader title={tenant.name} description={`Tenant Profile - ${tenant.tenantType === 'receipted' ? 'Receipted' : 'Non-Receipted'}`}>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => handleAction("Edit Profile", `/tenants/${tenantId}/edit`)}>
             <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
           </Button>
           <Button asChild variant="outline">
@@ -107,8 +116,8 @@ export default function TenantProfilePage() {
             </div>
           </CardContent>
            <CardFooter className="flex-col items-start gap-2">
-             <Button className="w-full"><MessageCircle className="mr-2 h-4 w-4"/>Send Message</Button>
-             <Button variant="outline" className="w-full"><DollarSign className="mr-2 h-4 w-4"/>Log Payment</Button>
+             <Button className="w-full" onClick={() => handleAction("Send Message")}><MessageCircle className="mr-2 h-4 w-4"/>Send Message</Button>
+             <Button variant="outline" className="w-full" onClick={() => router.push(`/payments?tab=overview&tenantId=${tenantId}`)}><DollarSign className="mr-2 h-4 w-4"/>Log Payment</Button>
            </CardFooter>
         </Card>
 
@@ -124,7 +133,7 @@ export default function TenantProfilePage() {
               <Card className="shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="font-headline">Payment History</CardTitle>
-                   <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Bill/Payment</Button>
+                   <Button variant="outline" size="sm" onClick={() => router.push(`/payments?tab=overview&tenantId=${tenantId}`)}><PlusCircle className="mr-2 h-4 w-4" /> Add Bill/Payment</Button>
                 </CardHeader>
                 <CardContent>
                   {paymentsForTenant.length > 0 ? (
@@ -169,7 +178,7 @@ export default function TenantProfilePage() {
               <Card className="shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="font-headline">Form 2307 Submissions</CardTitle>
-                   <Button variant="outline" size="sm" disabled={tenant.tenantType !== 'receipted'}><PlusCircle className="mr-2 h-4 w-4" /> Upload 2307</Button>
+                   <Button variant="outline" size="sm" disabled={tenant.tenantType !== 'receipted'} onClick={() => handleAction("Upload 2307", `/documents/upload?tenantId=${tenantId}&docType=form2307`)}><PlusCircle className="mr-2 h-4 w-4" /> Upload 2307</Button>
                 </CardHeader>
                 <CardContent>
                   {tenant.tenantType !== 'receipted' ? (
@@ -208,7 +217,7 @@ export default function TenantProfilePage() {
               <Card className="shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="font-headline">Communication Log</CardTitle>
-                   <Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Log</Button>
+                   <Button variant="outline" size="sm" onClick={() => handleAction("Add Communication Log")}><PlusCircle className="mr-2 h-4 w-4" /> Add Log</Button>
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground text-center py-4">Communication history (emails, calls, notes) will be displayed here.</p>

@@ -8,6 +8,10 @@ import { mockUnits as initialMockUnitsData } from './mockData';
 let currentUnitsStore: Unit[] = [...initialMockUnitsData];
 const listeners: Set<() => void> = new Set();
 
+const notifyListeners = () => {
+  listeners.forEach(listener => listener());
+}
+
 export const getUnits = (): Unit[] => {
   return [...currentUnitsStore]; // Return a copy
 };
@@ -30,7 +34,7 @@ export const addUnitToStore = (newUnitData: Omit<Unit, 'id' | 'buildingId' | 'te
     tenant: undefined, // New units have no tenant initially
   };
   currentUnitsStore = [newUnit, ...currentUnitsStore]; // Add to the beginning of the list
-  listeners.forEach(listener => listener()); // Notify all subscribers
+  notifyListeners();
   return newUnit;
 };
 
@@ -48,9 +52,32 @@ export const assignTenantToUnit = (unitId: string, tenant: Tenant): Unit | undef
     return unit;
   });
   if (updatedUnit) {
-    listeners.forEach(listener => listener());
+    notifyListeners();
   }
   return updatedUnit;
+};
+
+export const unassignTenantFromUnit = (unitId: string): Unit | undefined => {
+  let updatedUnit: Unit | undefined;
+  let unassignedTenantId: string | undefined;
+
+  currentUnitsStore = currentUnitsStore.map(unit => {
+    if (unit.id === unitId && unit.tenant) {
+      unassignedTenantId = unit.tenant.id;
+      updatedUnit = {
+        ...unit,
+        tenant: undefined,
+        status: 'vacant',
+      };
+      return updatedUnit;
+    }
+    return unit;
+  });
+
+  if (updatedUnit) {
+    notifyListeners();
+  }
+  return updatedUnit; // Return the unit that was modified, and its tenantId if needed elsewhere
 };
 
 

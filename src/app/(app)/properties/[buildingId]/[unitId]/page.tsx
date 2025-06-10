@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation'; // Added useRouter
+import { useParams, useRouter } from 'next/navigation'; 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +11,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getBuildings } from '@/lib/propertyStore'; 
-import { getUnitsByBuildingId, subscribeToUnits } from '@/lib/unitStore'; 
-import { mockTenants, mockRepairs } from '@/lib/mockData'; 
+import { getUnitsByBuildingId, subscribeToUnits, unassignTenantFromUnit as unassignTenantFromUnitInStore } from '@/lib/unitStore'; 
+import { updateTenantInStore, getTenantById } from '@/lib/tenantStore';
+import { mockRepairs } from '@/lib/mockData'; 
 import type { Unit, Tenant, Repair } from '@/lib/types';
-import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle, UserPlus } from 'lucide-react';
+import { ArrowLeft, UserCircle, BedDouble, Bath, Home as HomeIcon, DollarSign, Wrench, CalendarDays, Hammer, PlusCircle, UserPlus, Edit, FileCog, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function UnitDetailsPage() {
   const params = useParams();
-  const router = useRouter(); // Initialize router
+  const router = useRouter(); 
   const buildingId = params.buildingId as string;
   const unitId = params.unitId as string;
   const { toast } = useToast();
@@ -45,8 +57,7 @@ export default function UnitDetailsPage() {
     return () => unsubscribe();
   }, [buildingId, unitId]);
 
-
-  const tenant = unit?.tenant; // Directly use unit.tenant if populated by assignTenantToUnit
+  const tenant = unit?.tenant;
   const repairsForUnit = unit ? (unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId)) : [];
 
 
@@ -76,15 +87,12 @@ export default function UnitDetailsPage() {
     );
   }
 
-
   const handleLogRepair = () => {
-    console.log("Log Repair clicked for unit:", unitId);
-    toast({ title: "Action: Log Repair", description: "Functionality to log a new repair would be triggered here." });
+    router.push(`/properties/${buildingId}/${unitId}/log-repair`);
   };
 
   const handleUploadDocument = () => {
-    console.log("Upload Document clicked for unit:", unitId);
-    toast({ title: "Action: Upload Document", description: "Functionality to upload a unit-specific document would be triggered here." });
+     router.push(`/properties/${buildingId}/${unitId}/upload-document`);
   };
 
   const handleAssignTenant = () => {
@@ -96,27 +104,48 @@ export default function UnitDetailsPage() {
   };
   
   const handleEditUnitDetails = () => {
-    console.log("Edit Unit Details clicked for unit:", unitId);
-    toast({ title: "Action: Edit Unit Details", description: "Navigate to unit edit page or open edit modal." });
+    router.push(`/properties/${buildingId}/${unitId}/edit`);
   };
 
   const handleManageLease = () => {
-    console.log("Manage Lease clicked for unit:", unitId);
-    toast({ title: "Action: Manage Lease", description: "Open lease management options for this unit." });
+    router.push(`/properties/${buildingId}/${unitId}/manage-lease`);
   };
 
-  const handleMarkAsVacant = () => {
-    // This would ideally update the unitStore and also unassign the tenant in mockTenants/tenantStore
-    console.log("Mark as Vacant clicked for unit:", unitId);
-    toast({ title: "Action: Mark as Vacant", description: "Unit status would be updated to vacant (mocked)." });
-    // Example (incomplete, needs store update):
-    // if (unit && unit.tenant) {
-    //   const tenantToUnassign = mockTenants.find(t => t.id === unit.tenant!.id);
-    //   if (tenantToUnassign) {
-    //     tenantToUnassign.unitId = ''; // Clear assignment
-    //   }
-    //   // Call a function in unitStore like unassignTenantFromUnit(unit.id)
-    // }
+  const handleMarkAsVacant = async () => {
+    if (!unit || !unit.tenant) {
+        toast({ variant: "destructive", title: "Error", description: "No tenant assigned to this unit." });
+        return;
+    }
+    const tenantToUnassignId = unit.tenant.id;
+
+    try {
+      // 1. Update unit in unitStore
+      unassignTenantFromUnitInStore(unit.id);
+
+      // 2. Update tenant in tenantStore
+      const currentTenant = getTenantById(tenantToUnassignId);
+      if (currentTenant) {
+        updateTenantInStore({
+          id: tenantToUnassignId,
+          unitId: '',
+          unitNumber: '',
+          buildingName: '',
+        });
+      }
+      
+      toast({
+        title: "Tenant Unassigned",
+        description: `Tenant has been unassigned and Unit ${unit.unitNumber} is now marked as vacant.`,
+      });
+      // The component will re-render due to store subscriptions
+    } catch (error) {
+      console.error("Failed to unassign tenant:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to Unassign Tenant",
+        description: "An unexpected error occurred. Please try again.",
+      });
+    }
   };
 
 
@@ -235,10 +264,27 @@ export default function UnitDetailsPage() {
                     <CardTitle className="font-headline">Unit Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    <Button variant="outline" className="w-full" onClick={handleEditUnitDetails}>Edit Unit Details</Button>
-                    <Button variant="outline" className="w-full" onClick={handleManageLease} disabled={!tenant}>Manage Lease</Button>
+                    <Button variant="outline" className="w-full" onClick={handleEditUnitDetails}><Edit className="mr-2 h-4 w-4"/>Edit Unit Details</Button>
+                    <Button variant="outline" className="w-full" onClick={handleManageLease} disabled={!tenant}><FileCog className="mr-2 h-4 w-4"/>Manage Lease</Button>
                     {unit.status === 'occupied' && tenant && (
-                         <Button variant="destructive" className="w-full" onClick={handleMarkAsVacant}>Mark as Vacant / Unassign Tenant</Button>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" className="w-full"><LogOut className="mr-2 h-4 w-4"/>Mark as Vacant / Unassign Tenant</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will unassign {tenant.name} from Unit {unit.unitNumber} and mark the unit as vacant. 
+                                    This action cannot be undone easily from the UI.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleMarkAsVacant}>Confirm Unassign</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     )}
                      {unit.status === 'vacant' && (
                         <Button variant="default" className="w-full flex items-center" onClick={handleAssignTenant}>

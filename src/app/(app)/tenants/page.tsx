@@ -11,19 +11,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getTenants, subscribeToTenants } from '@/lib/tenantStore';
 import type { Tenant } from '@/lib/types';
-import { PlusCircle, MoreHorizontal, FileText, MessageSquare, Phone, AlertCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileText, MessageSquare, Phone, AlertCircle, UserCog } from 'lucide-react';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 export default function TenantsPage() {
   const [tenants, setTenants] = React.useState<Tenant[]>(() => getTenants());
+  const router = useRouter();
+  const { toast } = useToast();
 
   React.useEffect(() => {
     const updateTenants = () => setTenants(getTenants());
-    updateTenants(); // Initial fetch
+    updateTenants(); 
 
     const unsubscribe = subscribeToTenants(updateTenants);
     return () => unsubscribe();
   }, []);
+
+  const handleDropdownAction = (action: string, tenantId: string, path?: string) => {
+    if (path) {
+      router.push(path);
+    } else {
+      toast({ title: "Action (Mock)", description: `${action} for tenant ${tenantId}` });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -58,7 +70,6 @@ export default function TenantsPage() {
                 {tenants.map((tenant) => {
                   const contractEndDate = new Date(tenant.contractEndDate);
                   const today = new Date();
-                  // Check if contract ends within the next 2 months for "Near Expiry"
                   const twoMonthsFromNow = new Date();
                   twoMonthsFromNow.setMonth(today.getMonth() + 2);
                   const isNearExpiry = contractEndDate > today && contractEndDate <= twoMonthsFromNow;
@@ -110,16 +121,16 @@ export default function TenantsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/tenants/${tenant.id}`}>View Profile</Link>
+                            <DropdownMenuItem onClick={() => handleDropdownAction("View Profile", tenant.id, `/tenants/${tenant.id}`)}>
+                               <UserCog className="mr-2 h-4 w-4" /> View Profile
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDropdownAction("View Lease", tenant.id, `/tenants/${tenant.id}/lease`)}>
                               <FileText className="mr-2 h-4 w-4" /> View Lease
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDropdownAction("Send Message", tenant.id)}>
                               <MessageSquare className="mr-2 h-4 w-4" /> Send Message
                             </DropdownMenuItem>
-                             <DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleDropdownAction("Log Call", tenant.id)}>
                               <Phone className="mr-2 h-4 w-4" /> Log Call
                             </DropdownMenuItem>
                           </DropdownMenuContent>

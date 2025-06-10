@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import type { DocumentSummary } from '@/lib/types';
 import { UploadCloud, FileText, Download, Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
+import Link from 'next/link';
 
 export default function DocumentsPage() {
   const receipts = mockDocumentSummaries.filter(doc => doc.documentType === 'receipt');
@@ -61,8 +63,10 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Document Center" description="Centralized view for all receipts and Form 2307 submissions.">
-        <Button>
-          <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
+        <Button asChild>
+          <Link href="/documents/upload">
+            <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
+          </Link>
         </Button>
       </PageHeader>
 

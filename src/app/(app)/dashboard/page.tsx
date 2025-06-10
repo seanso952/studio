@@ -1,10 +1,11 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { mockBuildings, mockTenants, mockBillPayments, mockBouncedChecks } from "@/lib/mockData";
-import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock } from "lucide-react";
+import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock, UploadCloud } from "lucide-react";
 import Image from "next/image";
 
 interface StatCardProps {
@@ -85,7 +86,7 @@ export default function DashboardPage() {
           <CardContent className="grid grid-cols-2 gap-4">
             <Button asChild variant="outline"><Link href="/properties/add">Add New Property</Link></Button>
             <Button asChild variant="outline"><Link href="/tenants/add">Add New Tenant</Link></Button>
-            <Button asChild variant="outline"><Link href="/payments/log">Log a Payment</Link></Button>
+            <Button asChild variant="outline"><Link href="/payments?tab=overview">Log a Payment</Link></Button>
             <Button asChild variant="outline"><Link href="/documents/upload">Upload Document</Link></Button>
           </CardContent>
         </Card>

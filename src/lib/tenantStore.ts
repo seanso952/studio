@@ -35,11 +35,11 @@ export const addTenantToStore = (newTenantData: Omit<Tenant, 'id' | 'unitId' | '
   return newTenant;
 };
 
-export const updateTenantInStore = (updatedTenant: Tenant): Tenant | undefined => {
+export const updateTenantInStore = (updatedTenantData: Partial<Tenant> & { id: string }): Tenant | undefined => {
   let foundTenant: Tenant | undefined;
   currentTenantsStore = currentTenantsStore.map(tenant => {
-    if (tenant.id === updatedTenant.id) {
-      foundTenant = { ...tenant, ...updatedTenant };
+    if (tenant.id === updatedTenantData.id) {
+      foundTenant = { ...tenant, ...updatedTenantData };
       return foundTenant;
     }
     return tenant;
