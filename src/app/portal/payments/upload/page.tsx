@@ -81,8 +81,8 @@ export default function TenantPaymentUploadPage() {
     });
   };
 
+  // Conditional return for when tenant is not found
   if (!tenant) {
-    // Conditional return for when tenant is not found
     return (
          <div className="space-y-6">
             <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation here."/>
@@ -91,6 +91,7 @@ export default function TenantPaymentUploadPage() {
     );
   }
 
+  // Main component return
   return (
     <div className="space-y-6">
       <PageHeader title="Upload Proof of Payment" description="Submit your payment confirmation for an outstanding bill.">
@@ -117,7 +118,9 @@ export default function TenantPaymentUploadPage() {
                     <FormLabel>Select Bill</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Choose a bill to pay..." /></SelectValue>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a bill to pay..." />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {tenantUnpaidBills.length > 0 ? tenantUnpaidBills.map(bill => (
