@@ -3,7 +3,7 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 
 // Log the environment variables to help diagnose API key issues
-console.log("Attempting to initialize Firebase with the following config:");
+console.log("firebaseConfig.ts: Reading Firebase environment variables...");
 console.log("NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "Present" : "MISSING or UNDEFINED");
 console.log("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
 console.log("NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
@@ -22,29 +22,30 @@ const fbConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
+let app: FirebaseApp | undefined = undefined;
+let auth: Auth | undefined = undefined;
 
-if (!getApps().length) {
-  // Check if essential config values are present before initializing
-  if (!fbConfig.apiKey) {
-    console.error("CRITICAL: Firebase API Key (NEXT_PUBLIC_FIREBASE_API_KEY) is missing. Firebase will not be initialized.");
-    // To prevent crashing the app, we might assign a dummy app or handle this state,
-    // but for now, the error from getAuth will still occur if initialization fails.
-  }
-  try {
-    app = initializeApp(fbConfig);
-  } catch (error) {
-    console.error("Firebase initialization error:", error);
-    // Re-throw or handle as appropriate for your app's error strategy
-    throw error;
-  }
+if (!fbConfig.apiKey) {
+  console.error("CRITICAL: Firebase API Key (NEXT_PUBLIC_FIREBASE_API_KEY) is missing. Firebase will not be initialized, and authentication services will be unavailable.");
 } else {
-  app = getApps()[0];
+  // Only proceed if API key is present
+  if (!getApps().length) {
+    try {
+      console.log("Initializing Firebase app with config:", fbConfig);
+      app = initializeApp(fbConfig);
+      auth = getAuth(app);
+      console.log("Firebase app initialized successfully.");
+    } catch (error) {
+      console.error("Firebase initialization error:", error);
+      // app and auth will remain undefined if initialization fails
+      app = undefined;
+      auth = undefined;
+    }
+  } else {
+    app = getApps()[0];
+    auth = getAuth(app); // Assuming if app exists, auth can be retrieved or initialized.
+    console.log("Firebase app already initialized.");
+  }
 }
 
-const auth: Auth = getAuth(app);
-// const firestore: Firestore = getFirestore(app); // Example for Firestore
-// const storage: FirebaseStorage = getStorage(app); // Example for Storage
-
-export { app, auth /*, firestore, storage */ };
+export { app, auth };
