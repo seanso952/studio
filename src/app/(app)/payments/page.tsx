@@ -2,6 +2,9 @@
 'use client';
 
 import * as React from 'react';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,71 +15,209 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { mockBillPayments, mockBouncedChecks, mockTenants } from '@/lib/mockData';
 import type { BillPayment, BouncedCheck, BillType } from '@/lib/types';
-import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, AlertTriangle, Search, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
+import { useToast } from "@/hooks/use-toast";
+
+const billTypeValues = ['rent', 'electricity', 'water', 'association_dues', 'other'] as const;
+
+const billPaymentFormSchema = z.object({
+  tenantId: z.string().min(1, "Tenant is required"),
+  billType: z.enum(billTypeValues, { required_error: "Bill type is required" }),
+  amount: z.coerce.number({invalid_type_error: "Amount must be a number"}).positive("Amount must be positive"),
+  paymentDate: z.string().min(1, "Payment date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  proofOfPayment: z.instanceof(FileList).optional()
+    .refine(
+        (files) => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, // 5MB limit
+        `Max file size is 5MB.`
+      ).nullable(),
+  notes: z.string().optional(),
+});
+
+type BillPaymentFormValues = z.infer<typeof billPaymentFormSchema>;
 
 function BillPaymentForm() {
-  // Basic form structure, can be enhanced with react-hook-form
+  const [isLoading, setIsLoading] = React.useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<BillPaymentFormValues>({
+    resolver: zodResolver(billPaymentFormSchema),
+    defaultValues: {
+      tenantId: '',
+      billType: undefined,
+      amount: undefined,
+      paymentDate: '',
+      proofOfPayment: null,
+      notes: '',
+    },
+  });
+
+  const onSubmit: SubmitHandler<BillPaymentFormValues> = async (data) => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log("Bill Payment Data:", data);
+    if (data.proofOfPayment && data.proofOfPayment.length > 0) {
+        console.log("Proof of payment file:", data.proofOfPayment[0].name);
+    }
+    toast({ 
+        title: "Submission Successful", 
+        description: "Bill payment has been logged/submitted." 
+    });
+    form.reset();
+    setIsLoading(false);
+  };
+
   return (
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className="font-headline">Upload Bill Payment / Log Bill</CardTitle>
         <CardDescription>Submit proof of payment or log a new bill for a tenant.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="tenantSelect">Tenant</Label>
-            <Select>
-              <SelectTrigger id="tenantSelect"><SelectValue placeholder="Select Tenant" /></SelectTrigger>
-              <SelectContent>
-                {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="billType">Bill Type</Label>
-            <Select>
-              <SelectTrigger id="billType"><SelectValue placeholder="Select Bill Type" /></SelectTrigger>
-              <SelectContent>
-                {(['rent', 'electricity', 'water', 'association_dues', 'other'] as BillType[]).map(type => (
-                  <SelectItem key={type} value={type}>{type.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="amount">Amount</Label>
-            <Input id="amount" type="number" placeholder="0.00" />
-          </div>
-          <div>
-            <Label htmlFor="dueDate">Due Date / Payment Date</Label>
-            <Input id="dueDate" type="date" />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="proofOfPayment">Proof of Payment (Optional)</Label>
-          <Input id="proofOfPayment" type="file" />
-        </div>
-        <div>
-          <Label htmlFor="notes">Notes (Optional)</Label>
-          <Textarea id="notes" placeholder="Any relevant notes..." />
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button><Upload className="mr-2 h-4 w-4" /> Submit Payment / Log Bill</Button>
-      </CardFooter>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="tenantId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tenant</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger id="tenantSelect"><SelectValue placeholder="Select Tenant" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {mockTenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.buildingName} - {t.unitNumber})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="billType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bill Type</FormLabel>
+                     <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger id="billType"><SelectValue placeholder="Select Bill Type" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {billTypeValues.map(type => (
+                          <SelectItem key={type} value={type}>{type.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="paymentDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Due Date / Payment Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+             <FormField
+                control={form.control}
+                name="proofOfPayment"
+                render={({ field: { onChange, onBlur, name, ref } }) => (
+                    <FormItem>
+                    <FormLabel>Proof of Payment (Optional, Max 5MB)</FormLabel>
+                    <FormControl>
+                        <Input 
+                        type="file" 
+                        accept="image/*,.pdf"
+                        onBlur={onBlur}
+                        name={name}
+                        ref={ref}
+                        onChange={(e) => onChange(e.target.files)}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Any relevant notes..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" /> Submit Payment / Log Bill
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 }
 
 function ApprovalQueueTable({ payments }: { payments: BillPayment[] }) {
+  const { toast } = useToast();
   const pendingApproval = payments.filter(p => p.status === 'pending');
+
+  const handleApprove = (paymentId: string) => {
+    console.log("Approve payment:", paymentId);
+    toast({ title: "Payment Approved (Mock)", description: `Payment ID ${paymentId} marked as approved.` });
+    // Add logic to update payment status in mockData or state if needed for UI feedback
+  };
+  const handleReject = (paymentId: string) => {
+    console.log("Reject payment:", paymentId);
+    toast({ title: "Payment Rejected (Mock)", description: `Payment ID ${paymentId} marked as rejected.` });
+    // Add logic to update payment status
+  };
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -106,8 +247,8 @@ function ApprovalQueueTable({ payments }: { payments: BillPayment[] }) {
                   <TableCell>{format(new Date(payment.dueDate), 'MMM d, yyyy')}</TableCell>
                   <TableCell className="text-right space-x-2">
                     {payment.proofOfPaymentUrl && <Button variant="outline" size="sm" asChild><a href={payment.proofOfPaymentUrl} target="_blank" rel="noopener noreferrer">View Proof</a></Button>}
-                    <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700"><CheckCircle className="h-5 w-5" /></Button>
-                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700"><XCircle className="h-5 w-5" /></Button>
+                    <Button onClick={() => handleApprove(payment.id)} variant="ghost" size="icon" className="text-green-600 hover:text-green-700"><CheckCircle className="h-5 w-5" /></Button>
+                    <Button onClick={() => handleReject(payment.id)} variant="ghost" size="icon" className="text-red-600 hover:text-red-700"><XCircle className="h-5 w-5" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -174,6 +315,19 @@ function AllPaymentsTable({ payments }: { payments: BillPayment[] }) {
 
 
 function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
+  const { toast } = useToast();
+
+  const handleUpdateBouncedCheckStatus = (checkId: string) => {
+    console.log("Update bounced check status:", checkId);
+    toast({ title: "Status Updated (Mock)", description: `Bounced check ID ${checkId} status updated.` });
+    // Add logic to update status
+  };
+  
+  const handleLogBouncedCheck = () => {
+    console.log("Log Bounced Check clicked");
+    toast({ title: "Action (Mock)", description: "Log Bounced Check form would open here." });
+  };
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -211,7 +365,7 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm">Update Status</Button>
+                    <Button onClick={() => handleUpdateBouncedCheckStatus(check.id)} variant="outline" size="sm">Update Status</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -222,7 +376,7 @@ function BouncedChecksTable({ checks }: { checks: BouncedCheck[] }) {
         )}
       </CardContent>
       <CardFooter>
-        <Button variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Log Bounced Check</Button>
+        <Button onClick={handleLogBouncedCheck} variant="outline"><PlusCircle className="mr-2 h-4 w-4" /> Log Bounced Check</Button>
       </CardFooter>
     </Card>
   );
@@ -268,3 +422,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+
