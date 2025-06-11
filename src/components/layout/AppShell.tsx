@@ -46,7 +46,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getCurrentUser, logoutFirebaseUser, subscribeToUserChanges } from '@/lib/authStore';
 import type { AppUser } from '@/lib/types';
-import { auth } from '@/lib/firebaseConfig';
+import { auth } from '@/lib/firebaseConfig'; // Import auth
 
 const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -65,35 +65,42 @@ const adminOnlyNavItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [appUser, setAppUserLocal] = React.useState<AppUser | null>(getCurrentUser()); // Changed variable name
+  const [appUser, setAppUserLocal] = React.useState<AppUser | null>(getCurrentUser());
   const [authLoading, setAuthLoading] = React.useState(true);
 
 
   React.useEffect(() => {
     const unsubscribe = subscribeToUserChanges(() => {
       const user = getCurrentUser();
-      setAppUserLocal(user); // Changed variable name
-      setAuthLoading(false); 
+      setAppUserLocal(user);
+      setAuthLoading(false);
 
       if (!user && pathname !== '/login' && pathname !== '/logout') {
         router.push('/login');
       }
     });
-    
+
     // Initial check
     const initialUser = getCurrentUser();
-    setAppUserLocal(initialUser); // Changed variable name
+    setAppUserLocal(initialUser);
+
     if (auth && auth.currentUser === null && !initialUser) {
-      // Only set loading to false if we are sure auth state is resolved (no user)
+      // Firebase auth is available, but no user is signed in, and local store also shows no user.
       setAuthLoading(false);
        if (pathname !== '/login' && pathname !== '/logout') router.push('/login');
     } else if (initialUser) {
-      setAuthLoading(false); // User is already known
+      // User was already available in local store (e.g., from a previous session or fast onAuthStateChanged)
+      setAuthLoading(false);
+    } else if (!auth) {
+      // Firebase auth service itself is not available (e.g., API key was missing or initialization failed)
+      console.warn('AppShell: Firebase auth service not available. Redirecting to login if necessary.');
+      setAuthLoading(false);
+      if (pathname !== '/login' && pathname !== '/logout') router.push('/login');
     }
-    // If !auth (Firebase not initialized), authLoading will also be set to false by the first subscription callback
+    // If none of the above, authLoading remains true until the onAuthStateChanged in subscribeToUserChanges fires and sets it.
 
     return () => unsubscribe();
-  }, [pathname, router]);
+  }, [pathname, router, auth]); // Added auth to dependency array
 
   const handleLogout = async () => {
     await logoutFirebaseUser();
@@ -101,22 +108,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
    const handleRoleSwitchSimulate = (rolePath: string) => {
-    // This simulation logic might need refinement based on real custom claims behavior
-    if (rolePath === '/portal/dashboard' && appUser?.role !== 'tenant') { // Changed variable name
+    if (rolePath === '/portal/dashboard' && appUser?.role !== 'tenant') {
         alert("To access the tenant portal, please log in with a tenant account (e.g., one with a 'tenant' custom claim).");
         return;
     }
-    if (appUser?.role === 'tenant' && rolePath === '/dashboard'){ // Changed variable name
+    if (appUser?.role === 'tenant' && rolePath === '/dashboard'){
         alert("Tenants cannot access the admin/manager dashboard. Please log out and log in with an admin/manager account.");
         return;
     }
     router.push(rolePath);
   };
-  
+
   let navItems = navItemsBase;
-  if (appUser?.role === 'admin') { // Changed variable name
+  if (appUser?.role === 'admin') {
     navItems = [...navItemsBase, ...adminOnlyNavItems];
-  } else if (appUser?.role === 'manager') { // Changed variable name
+  } else if (appUser?.role === 'manager') {
     navItems = navItemsBase.map(item => item.href === '/properties' ? {...item, label: 'My Properties'} : item);
   }
 
@@ -130,24 +136,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If not loading and no user, and not on login/logout page, redirect.
-  // This check is now primarily handled by the effect, but good as a fallback.
-  if (!authLoading && !appUser && pathname !== '/login' && pathname !== '/logout') { // Changed variable name
-     if (typeof window !== 'undefined') router.push('/login'); // Ensure router.push only runs client-side
-    return (
-        <div className="flex h-screen w-full items-center justify-center">
-            <p>Redirecting to login...</p>
-        </div>
-    );
-  }
-  
+  // If not loading and no user, and not on login/logout page, the useEffect will handle redirection.
+  // The direct router.push here was causing the error.
+
   // For login page itself, or if user is not yet available but we are loading.
-  if (!appUser && (pathname === '/login' || pathname === '/logout')) { // Changed variable name
+  if (!appUser && (pathname === '/login' || pathname === '/logout')) {
     return <>{children}</>; // Render login/logout page without AppShell
   }
-  
+
   // If user is available, render AppShell
-  if (appUser) { // Changed variable name
+  if (appUser) {
     return (
       <SidebarProvider defaultOpen>
         <div className="flex min-h-screen">
@@ -220,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <SidebarInset className={cn(
               "flex-1 flex flex-col",
-              "bg-background" 
+              "bg-background"
           )}>
             <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-card px-6 shadow-sm">
               <SidebarTrigger className="md:hidden" />
@@ -229,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </header>
             <main className={cn(
               "flex-1 overflow-y-auto",
-              "p-4 md:p-6 lg:p-8" 
+              "p-4 md:p-6 lg:p-8"
               )}>
               {children}
             </main>
@@ -239,6 +237,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
   // Fallback for when auth is loading or no user and on login/logout page.
-  // This state should ideally be covered by the authLoading check or initial redirect.
+  // This state should ideally be covered by the authLoading check or initial redirect within useEffect.
   return <>{children}</>;
 }
+
