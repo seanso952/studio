@@ -1,7 +1,10 @@
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions"; // For logger
 import * as admin from "firebase-admin";
+
+// For V2 Callable Functions
 import { HttpsError, onCall, CallableRequest } from "firebase-functions/v2/https";
+// For V2 Auth Triggers
 import { onUserCreated, AuthEvent } from "firebase-functions/v2/auth";
 
 admin.initializeApp();
