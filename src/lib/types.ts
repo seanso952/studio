@@ -100,15 +100,22 @@ export interface DocumentSummary {
 
 export type UserRole = 'admin' | 'manager' | 'tenant' | null; // null for unauthenticated or undefined role
 
-export interface MockAuthUser {
-  id: string; // Firebase UID or mock ID
-  name: string;
-  email?: string | null;
-  role: UserRole;
-  assignedBuildingIds?: string[]; // For managers
-  firebaseUser?: FirebaseUser | null; // Store the actual Firebase user object
+// Represents the user state in the application, derived from Firebase Auth and Custom Claims
+export interface AppUser {
+  uid: string; // Firebase UID
+  name: string | null; // From custom claim 'name' or FirebaseUser displayName
+  email: string | null;
+  role: UserRole; // From custom claim 'role'
+  assignedBuildingIds?: string[]; // From custom claim 'assignedBuildingIds' (for managers)
+  firebaseUser: FirebaseUser; // The raw Firebase user object
 }
 
-// For displaying users in user management, can be similar to MockAuthUser
-export interface DisplayUser extends MockAuthUser {}
-
+// For displaying users in user management page (can include more details if needed)
+// The 'role' here would ideally match the custom claim for that user.
+export interface DisplayUser {
+  uid: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  assignedBuildingIds?: string[];
+}

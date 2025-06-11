@@ -14,22 +14,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, ShieldAlert, UserCheck, UserCog } from 'lucide-react';
-import { getMockUsersForDisplay, simulateUpdateUserRole, getCurrentUser } from '@/lib/authStore';
+import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon } from 'lucide-react'; // Renamed UserCog to AdminIcon for clarity
+import { getDisplayUsers, requestRoleUpdate, getCurrentUser } from '@/lib/authStore';
 import type { DisplayUser, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 
 export default function UserManagementPage() {
-  const [users, setUsers] = React.useState<DisplayUser[]>(getMockUsersForDisplay());
+  const [users, setUsers] = React.useState<DisplayUser[]>(getDisplayUsers());
   const { toast } = useToast();
   const router = useRouter();
-  const currentUser = getCurrentUser();
+  const appUser = getCurrentUser(); // Changed from currentUser to appUser to avoid conflict
+
+  React.useEffect(() => {
+    // Fetch initial users - in a real app, this might be an API call
+    setUsers(getDisplayUsers());
+  }, []);
 
   // Redirect if not admin
   React.useEffect(() => {
-    if (currentUser && currentUser.role !== 'admin') {
+    if (appUser && appUser.role !== 'admin') {
       toast({
         variant: "destructive",
         title: "Access Denied",
@@ -37,17 +42,24 @@ export default function UserManagementPage() {
       });
       router.push('/dashboard');
     }
-  }, [currentUser, router, toast]);
+  }, [appUser, router, toast]);
   
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    const result = await simulateUpdateUserRole(userId, newRole);
+    // Ensure the current user is an admin before attempting role change
+    if (appUser?.role !== 'admin') {
+        toast({ variant: "destructive", title: "Permission Denied", description: "Only admins can change user roles."});
+        return;
+    }
+
+    const result = await requestRoleUpdate(userId, newRole);
     if (result.success) {
       toast({
-        title: "Role Update Simulated",
+        title: "Role Update Requested",
         description: result.message,
       });
       // Re-fetch mock users to reflect the "change" in the UI for this demo
-      setUsers(getMockUsersForDisplay());
+      // In a real app, you might optimistically update or re-fetch from the backend.
+      setUsers(getDisplayUsers()); 
     } else {
       toast({
         variant: "destructive",
@@ -57,16 +69,16 @@ export default function UserManagementPage() {
     }
   };
 
-  if (currentUser?.role !== 'admin') {
+  if (appUser?.role !== 'admin') {
     // Render minimal content or loader while redirecting
-    return <div className="p-6"><p>Loading or redirecting...</p></div>;
+    return <div className="p-6"><PageHeader title="User Management" /><p>Loading or redirecting...</p></div>;
   }
 
   const roleIcons: Record<UserRole | string, React.ElementType> = {
-    admin: ShieldAlert,
-    manager: UserCog,
-    tenant: UserCheck,
-    null: UserCheck, // Default icon for null role
+    admin: AdminIcon,
+    manager: ManagerIcon,
+    tenant: TenantIcon,
+    null: TenantIcon, // Default icon
   };
   
   const roleColors: Record<UserRole | string, string> = {
@@ -80,14 +92,14 @@ export default function UserManagementPage() {
     <div className="space-y-6">
       <PageHeader
         title="User Management"
-        description="View and manage user roles and permissions within the system."
+        description="View users and request role changes (requires backend Firebase Function)."
       />
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="font-headline">System Users</CardTitle>
+          <CardTitle className="font-headline">System Users (Demo Data)</CardTitle>
           <CardDescription>
-            List of users registered in the system. Role changes are simulated for this demo.
+            List of users. Role changes trigger a simulated backend request. Implement a Firebase Function (e.g., 'setUserRole') to make this functional.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,16 +109,16 @@ export default function UserManagementPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Current Role</TableHead>
+                  <TableHead>Current Role (Claim)</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => {
-                  const Icon = roleIcons[user.role || 'null'] || UserCheck;
+                  const Icon = roleIcons[user.role || 'null'] || TenantIcon;
                   const badgeColor = roleColors[user.role || 'null'] || 'bg-gray-400';
                   return (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.uid}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
@@ -118,7 +130,7 @@ export default function UserManagementPage() {
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" disabled={appUser?.uid === user.uid && user.role === 'admin'}>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -127,12 +139,12 @@ export default function UserManagementPage() {
                             <DropdownMenuSeparator />
                             {(['admin', 'manager', 'tenant'] as UserRole[]).map((roleOption) => (
                               <DropdownMenuItem
-                                key={roleOption}
-                                onClick={() => handleRoleChange(user.id, roleOption)}
-                                disabled={user.role === roleOption}
+                                key={roleOption || 'null-role'}
+                                onClick={() => handleRoleChange(user.uid, roleOption)}
+                                disabled={user.role === roleOption || (appUser?.uid === user.uid && roleOption !== 'admin' && user.role === 'admin')} // Prevent admin from accidentally demoting themselves from this UI easily
                               >
                                 <Edit className="mr-2 h-4 w-4" />
-                                {roleOption ? roleOption.charAt(0).toUpperCase() + roleOption.slice(1) : 'Undefined'}
+                                {roleOption ? roleOption.charAt(0).toUpperCase() + roleOption.slice(1) : 'No Role'}
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>
@@ -144,12 +156,13 @@ export default function UserManagementPage() {
               </TableBody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center py-4">No users found.</p>
+            <p className="text-muted-foreground text-center py-4">No users found (using mock data).</p>
           )}
            <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
-            <strong>Note:</strong> User role modifications in this demo are for UI illustration purposes only.
-            They do not persist and are not connected to a real backend role management system.
-            Actual role management requires setting Firebase Custom Claims or managing roles in a database via a secure backend.
+            <strong>Note:</strong> User role modifications here simulate a call to a backend Firebase Function.
+            You need to implement a Firebase Function (e.g., `setUserRole`) that uses the Firebase Admin SDK to set custom user claims.
+            Users will need to re-authenticate or have their ID token refreshed for client-side role changes to take effect.
+            The user list is currently mock data; a real implementation would fetch this from a backend function.
           </p>
         </CardContent>
       </Card>
