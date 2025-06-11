@@ -41,7 +41,7 @@ export default function UnitDetailsPage() {
   const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
   const [unit, setUnit] = React.useState<Unit | undefined>(undefined);
   
-  const allBuildings = getBuildings(); // Static, consider subscription if buildings change
+  const allBuildings = getBuildings(); 
   const building = allBuildings.find(b => b.id === buildingId);
   
   React.useEffect(() => {
@@ -66,11 +66,7 @@ export default function UnitDetailsPage() {
     };
   }, [buildingId, unitId]);
 
-  const tenant = unit?.tenant;
-  const repairsForUnit = unit ? (unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId)) : [];
-
-  const canViewUnit = currentUser.role === 'admin' || (currentUser.role === 'manager' && currentUser.assignedBuildingIds?.includes(buildingId));
-
+  // 1. Check if building exists
   if (!building) { 
     return (
       <div className="text-center py-10">
@@ -84,7 +80,29 @@ export default function UnitDetailsPage() {
     );
   }
   
-  if (!unit && canViewBuilding) { // Check canViewBuilding before showing unit not found for this building
+  // 2. Determine user's permission for this building's units
+  // Ensure currentUser is available; AppShell should handle auth loading state.
+  // If currentUser could be null here, additional loading/error handling for that state would be needed.
+  const canViewUnit = currentUser.role === 'admin' || (currentUser.role === 'manager' && currentUser.assignedBuildingIds?.includes(buildingId));
+
+  // 3. If user does not have permission, show Access Denied
+  if (!canViewUnit) {
+    return (
+     <div className="text-center py-10">
+       <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
+       <h2 className="text-2xl font-semibold text-destructive">Access Denied</h2>
+       <p className="text-muted-foreground">You do not have permission to view this unit.</p>
+       <Button asChild variant="link" className="mt-4">
+         <Link href={`/properties`}> 
+           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Properties
+         </Link>
+       </Button>
+     </div>
+   );
+  }
+
+  // 4. If user has permission, but the specific unit is not found (or not yet loaded from useEffect)
+  if (!unit) { 
      return (
       <div className="text-center py-10">
         <h2 className="text-2xl font-semibold">Unit not found</h2>
@@ -97,21 +115,9 @@ export default function UnitDetailsPage() {
     );
   }
 
-  if (!canViewUnit) {
-    return (
-     <div className="text-center py-10">
-       <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
-       <h2 className="text-2xl font-semibold text-destructive">Access Denied</h2>
-       <p className="text-muted-foreground">You do not have permission to view this unit.</p>
-       <Button asChild variant="link" className="mt-4">
-         <Link href={`/properties`}> {/* Or /properties/${buildingId} if they could see the building but not unit */}
-           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Properties
-         </Link>
-       </Button>
-     </div>
-   );
- }
-
+  // If all checks pass, unit and building are defined, and user has permission.
+  const tenant = unit.tenant; // unit is guaranteed to be defined here
+  const repairsForUnit = unit.repairs.length > 0 ? unit.repairs : mockRepairs.filter(r => r.unitId === unitId);
 
   const handleLogRepair = () => {
     router.push(`/properties/${buildingId}/${unitId}/log-repair`);
@@ -122,7 +128,7 @@ export default function UnitDetailsPage() {
   };
 
   const handleAssignTenant = () => {
-    if (unit && unit.status === 'vacant') {
+    if (unit.status === 'vacant') {
       router.push(`/properties/${buildingId}/${unitId}/assign-tenant`);
     } else {
       toast({ title: "Unit Occupied", description: "This unit is already occupied or cannot be assigned a tenant."});
@@ -138,7 +144,7 @@ export default function UnitDetailsPage() {
   };
 
   const handleMarkAsVacant = async () => {
-    if (!unit || !unit.tenant) {
+    if (!unit.tenant) { // unit is defined here
         toast({ variant: "destructive", title: "Error", description: "No tenant assigned to this unit." });
         return;
     }
@@ -318,3 +324,4 @@ export default function UnitDetailsPage() {
     </div>
   );
 }
+
