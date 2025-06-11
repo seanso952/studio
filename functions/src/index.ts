@@ -1,12 +1,7 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import {
-  onCall,
-  HttpsError,
-  type CallableRequest,
-} from "firebase-functions/v2/https";
-import { onUserCreated } from "firebase-functions/v2/auth";
+import * as functionsV2 from "firebase-functions/v2"; // Import the main V2 module
 
 admin.initializeApp();
 
@@ -31,13 +26,13 @@ interface ListedUser {
 }
 
 // Callable function to set a user's role (e.g., 'admin', 'manager', etc.) - v2 syntax
-export const setUserRole = onCall(
-  async (request: CallableRequest<SetUserRoleData>) => {
+export const setUserRole = functionsV2.https.onCall(
+  async (request: functionsV2.https.CallableRequest<SetUserRoleData>) => {
     // Security: only allow admins to call this
     // The 'admin' property on token is a custom claim you must set for admin users.
     // If you use { role: 'admin' }, change to: request.auth?.token.role !== 'admin'
     if (request.auth?.token.admin !== true) {
-      throw new HttpsError(
+      throw new functionsV2.https.HttpsError(
         "permission-denied",
         "Only admins can assign roles."
       );
@@ -46,7 +41,7 @@ export const setUserRole = onCall(
     const { uid, role } = request.data;
 
     if (!uid || !role) {
-      throw new HttpsError(
+      throw new functionsV2.https.HttpsError(
         "invalid-argument",
         "Both uid and role must be provided."
       );
@@ -54,7 +49,7 @@ export const setUserRole = onCall(
 
     const validRoles = ["admin", "manager", "tenant"];
     if (!validRoles.includes(role)) {
-      throw new HttpsError(
+      throw new functionsV2.https.HttpsError(
         "invalid-argument",
         `Invalid role: ${role}. Must be one of ${validRoles.join(", ")}.`
       );
@@ -67,15 +62,17 @@ export const setUserRole = onCall(
     } catch (error) {
       functions.logger.error(`Error setting role for user ${uid}:`, error);
       if (error instanceof Error) {
-        throw new HttpsError("internal", `Failed to set user role: ${error.message}`);
+        throw new functionsV2.https.HttpsError("internal", `Failed to set user role: ${error.message}`);
       }
-      throw new HttpsError("internal", "Failed to set user role due to an unknown error.");
+      throw new functionsV2.https.HttpsError("internal", "Failed to set user role due to an unknown error.");
     }
   }
 );
 
 // Automatically assign a 'tenant' role to every new user - v2 syntax
-export const assignDefaultRole = onUserCreated(async (event) => {
+// The event type for onUserCreated is functionsV2.auth.AuthBlockingEvent or specific like functionsV2.auth.UserCreatedEvent
+// Let's use functionsV2.auth.UserCreatedEvent if available, or a more generic functionsV2.auth.AuthEvent
+export const assignDefaultRole = functionsV2.auth.onUserCreated(async (event: functionsV2.auth.AuthEvent) => {
   const user = event.data; // user is of type admin.auth.UserRecord
   try {
     await admin.auth().setCustomUserClaims(user.uid, { role: "tenant" });
@@ -83,18 +80,16 @@ export const assignDefaultRole = onUserCreated(async (event) => {
   } catch (error) {
     functions.logger.error(`Error assigning default role to user ${user.uid}:`, error);
     // Depending on your requirements, you might want to handle this error more gracefully
-    // or ensure it doesn't block user creation if absolutely critical.
   }
 });
 
 // Callable function to list all users with their roles - v2 syntax
-export const listUsersWithRoles = onCall(
-  async (request: CallableRequest<UserListUserData>) => {
+export const listUsersWithRoles = functionsV2.https.onCall(
+  async (request: functionsV2.https.CallableRequest<UserListUserData>) => {
     // Security: only allow admins
-    // The 'admin' property on token is a custom claim you must set for admin users.
-    // If you use { role: 'admin' }, change to: request.auth?.token.role !== 'admin'
+    // if (request.auth?.token.role !== 'admin') {
     if (request.auth?.token.admin !== true) {
-      throw new HttpsError(
+      throw new functionsV2.https.HttpsError(
         "permission-denied",
         "Only admins can list users."
       );
@@ -130,9 +125,9 @@ export const listUsersWithRoles = onCall(
     } catch (error) {
       functions.logger.error("Error listing users:", error);
       if (error instanceof Error) {
-          throw new HttpsError("internal", `Failed to list users: ${error.message}`);
+          throw new functionsV2.https.HttpsError("internal", `Failed to list users: ${error.message}`);
       }
-      throw new HttpsError("internal", "Failed to list users due to an unknown error.");
+      throw new functionsV2.https.HttpsError("internal", "Failed to list users due to an unknown error.");
     }
   }
 );
