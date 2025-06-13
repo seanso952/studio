@@ -1,10 +1,11 @@
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions"; // This is the v2 default export
+import * as functionsV1 from "firebase-functions/v1"; // Explicitly import v1 for v1 features
 import * as admin from "firebase-admin";
 
-// V2 Imports
+// V2 Imports for Callable functions and Auth triggers
 import {HttpsError, onCall, CallableRequest} from "firebase-functions/v2/https";
-import {onUserCreated, AuthEvent} from "firebase-functions/v2/auth";
+import {AuthEvent, onUserCreated} from "firebase-functions/v2/auth"; // Using v2 onUserCreated
 
 admin.initializeApp();
 
@@ -34,9 +35,6 @@ interface ListedUser {
 // Callable function to set a user's role (e.g., 'admin', 'manager', etc.) - v2
 export const setUserRole = onCall(
   async (request: CallableRequest<SetUserRoleData>) => {
-    const {uid, role} = request.data;
-
-    // Log incoming data and caller identity for debugging bootstrap
     functions.logger.info("setUserRole: Received data:", JSON.stringify(request.data));
     functions.logger.info("setUserRole: Caller auth object:", JSON.stringify(request.auth));
     if (request.auth?.token) {
@@ -45,6 +43,7 @@ export const setUserRole = onCall(
       functions.logger.info("setUserRole: Caller admin claim from token:", request.auth.token.admin);
     }
 
+    const {uid, role} = request.data;
 
     // Special condition for bootstrapping the first admin.
     // This allows admin@example.com to set THEIR OWN role to 'admin'
@@ -105,16 +104,16 @@ export const setUserRole = onCall(
   }
 );
 
-// Automatically assign a 'tenant' role to every new user - v2
+// Automatically assign a 'tenant' role to every new user - Using V2 Auth Trigger for consistency
 export const assignDefaultRole = onUserCreated(async (event: AuthEvent) => {
-  const user = event.data; // user is of type admin.auth.UserRecord
+  const user = event.data; // user is of type UserRecord from firebase-admin/auth
   try {
     await admin.auth().setCustomUserClaims(user.uid, {role: "tenant"});
-    functions.logger.info(
+    functions.logger.info( // Using v2 logger
       `Assigned default 'tenant' role to new user: ${user.uid}`
     );
   } catch (error) {
-    functions.logger.error(
+    functions.logger.error( // Using v2 logger
       `Error assigning default role to user ${user.uid}:`, error
     );
   }
@@ -159,7 +158,7 @@ export const listUsersWithRoles = onCall(
       const allUsers = await listAllUsersRecursively();
       return {users: allUsers};
     } catch (error) {
-      functions.logger.error("Error listing users:", error);
+      functions.logger.error("Error listing users:", error); // Using v2 logger
       if (error instanceof Error) {
         throw new HttpsError(
           "internal", `Failed to list users: ${error.message}`
