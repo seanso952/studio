@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { mockBuildings, mockTenants, mockBillPayments, mockBouncedChecks } from "@/lib/mockData";
-import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock, UploadCloud, Briefcase } from "lucide-react";
+import { Building2, Users, AlertTriangle, FileWarning, ArrowRight, DollarSign, CalendarClock, UploadCloud, Briefcase, Loader2 } from "lucide-react";
 import Image from "next/image";
-import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
+import { getCurrentUser, subscribeToUserChanges, type AppUser } from '@/lib/authStore'; // Changed MockAuthUser to AppUser
 import { PageHeader } from '@/components/shared/PageHeader';
 
 interface StatCardProps {
@@ -43,7 +43,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, descripti
 
 
 export default function DashboardPage() {
-  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
+  const [currentUser, setCurrentUserLocal] = React.useState<AppUser | null>(getCurrentUser());
 
   React.useEffect(() => {
     const updateUser = () => setCurrentUserLocal(getCurrentUser());
@@ -51,6 +51,15 @@ export default function DashboardPage() {
     const unsubscribe = subscribeToUserChanges(updateUser);
     return () => unsubscribe();
   }, []);
+
+  if (!currentUser) {
+    return (
+      <div className="flex h-[calc(100vh-theme(spacing.14))] w-full items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-2">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   const buildingsToDisplay = currentUser.role === 'manager' 
     ? mockBuildings.filter(b => currentUser.assignedBuildingIds?.includes(b.id)) 
@@ -95,13 +104,15 @@ export default function DashboardPage() {
     { id: "alert2", message: "Bounced check from Bob The Builder needs follow-up.", severity: "medium" },
   ].filter(alert => { // Basic filter, could be more sophisticated
     if (currentUser.role === 'manager') {
+      // Ensure currentUser and assignedBuildingIds are checked
       return alert.message.includes("Unit 1B") && currentUser.assignedBuildingIds?.includes('building1'); // Example
     }
     return true;
   });
 
   const pageTitle = currentUser.role === 'manager' ? "Manager Dashboard" : "Admin Dashboard";
-  const pageDescription = currentUser.role === 'manager' ? `Welcome, ${currentUser.name}! Overview of your assigned properties.` : "Welcome to EstateMind Admin Panel";
+  const pageDescription = currentUser.role === 'manager' ? `Welcome, ${currentUser.name || 'Manager'}! Overview of your assigned properties.` : "Welcome to EstateMind Admin Panel";
+
 
   return (
     <div className="space-y-6">
