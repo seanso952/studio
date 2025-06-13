@@ -1,9 +1,9 @@
 
 'use client';
 
-import { auth, functions } from './firebaseConfig'; // Import functions
+import { auth, functions } from './firebaseConfig';
 import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser, getIdTokenResult } from 'firebase/auth';
-import { httpsCallable, type HttpsCallable } from 'firebase/functions'; // For calling Firebase Functions
+import { httpsCallable, type HttpsCallable } from 'firebase/functions';
 import type { AppUser, UserRole, DisplayUser } from './types';
 
 let currentUser: AppUser | null = null;
