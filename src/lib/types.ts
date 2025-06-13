@@ -98,7 +98,7 @@ export interface DocumentSummary {
   url: string;
 }
 
-export type UserRole = 'admin' | 'manager' | 'tenant' | null; // null for unauthenticated or undefined role
+export type UserRole = 'admin' | 'manager' | 'tenant' | 'none' | null; // Added 'none' for unassigned roles from backend
 
 // Represents the user state in the application, derived from Firebase Auth and Custom Claims
 export interface AppUser {
@@ -110,12 +110,14 @@ export interface AppUser {
   firebaseUser: FirebaseUser; // The raw Firebase user object
 }
 
-// For displaying users in user management page (can include more details if needed)
-// The 'role' here would ideally match the custom claim for that user.
+// For displaying users in user management page (now matches listUsersWithRoles function)
 export interface DisplayUser {
   uid: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  assignedBuildingIds?: string[];
+  email?: string; // Email can be optional if not always returned or available
+  displayName?: string;
+  role: UserRole; // This comes from customClaims.role
+  disabled: boolean;
+  creationTime: string;
+  lastSignInTime: string;
+  // Add other fields from your listUsersWithRoles function as needed
 }
