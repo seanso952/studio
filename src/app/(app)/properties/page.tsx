@@ -9,8 +9,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getBuildings, subscribeToBuildings } from '@/lib/propertyStore'; 
 import type { Building } from '@/lib/types';
-import { PlusCircle, MapPin, Users, Home } from 'lucide-react';
-import { getCurrentUser, subscribeToUserChanges, type MockAuthUser } from '@/lib/authStore';
+import { PlusCircle, MapPin, Users, Home, Loader2 } from 'lucide-react'; // Added Loader2
+import { getCurrentUser, subscribeToUserChanges } from '@/lib/authStore';
+import type { AppUser } from '@/lib/types'; // Import AppUser
 
 function PropertyCard({ building }: { building: Building }) {
   return (
@@ -54,7 +55,7 @@ function PropertyCard({ building }: { building: Building }) {
 
 export default function PropertiesPage() {
   const [allBuildings, setAllBuildings] = React.useState<Building[]>(() => getBuildings());
-  const [currentUser, setCurrentUserLocal] = React.useState<MockAuthUser>(getCurrentUser());
+  const [currentUser, setCurrentUserLocal] = React.useState<AppUser | null>(getCurrentUser()); // Use AppUser | null
 
   React.useEffect(() => {
     const updateUser = () => setCurrentUserLocal(getCurrentUser());
@@ -70,6 +71,15 @@ export default function PropertiesPage() {
       unsubscribeBuildings();
     };
   }, []);
+
+  if (!currentUser) {
+    return (
+      <div className="flex h-[calc(100vh-theme(spacing.14))] w-full items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-2">Loading properties...</p>
+      </div>
+    );
+  }
 
   const buildingsToDisplay = currentUser.role === 'manager'
     ? allBuildings.filter(b => currentUser.assignedBuildingIds?.includes(b.id))
