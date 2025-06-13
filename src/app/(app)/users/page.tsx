@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added this line
 import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { fetchDisplayUsers, requestRoleUpdate, getCurrentUser } from '@/lib/authStore';
 import type { AppUser, DisplayUser, UserRole } from '@/lib/types';
@@ -186,7 +187,7 @@ export default function UserManagementPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" disabled={appUser?.uid === user.uid && appUser?.role === 'admin' && user.role === 'admin'}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
