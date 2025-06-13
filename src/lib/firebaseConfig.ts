@@ -33,8 +33,13 @@ if (!fbConfig.apiKey) {
     try {
       console.log("Initializing Firebase app with config:", fbConfig);
       app = initializeApp(fbConfig);
-      auth = getAuth(app);
-      console.log("Firebase app initialized successfully.");
+      console.log("Firebase app object initialized:", app ? "Success" : "Failed");
+      if (app) {
+        auth = getAuth(app);
+        console.log("Firebase auth object initialized:", auth ? "Success" : "Failed");
+      } else {
+         console.error("Firebase app initialization returned undefined. Auth will not be available.");
+      }
     } catch (error) {
       console.error("Firebase initialization error:", error);
       // app and auth will remain undefined if initialization fails
@@ -43,9 +48,14 @@ if (!fbConfig.apiKey) {
     }
   } else {
     app = getApps()[0];
-    auth = getAuth(app); // Assuming if app exists, auth can be retrieved or initialized.
-    console.log("Firebase app already initialized.");
+    auth = getAuth(app); 
+    console.log("Firebase app already initialized. Auth object:", auth ? "Available" : "Unavailable");
   }
 }
 
+if (!auth) {
+    console.error("CRITICAL: Firebase Auth service is NOT available after initialization attempt. Login and auth-related features will fail.");
+}
+
 export { app, auth };
+

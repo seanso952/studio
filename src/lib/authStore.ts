@@ -20,35 +20,39 @@ const notifyListeners = () => {
 
 const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) => {
   if (firebaseUserFromListener) {
+    console.log(`authStore: Attempting to update state for user: ${firebaseUserFromListener.email}`);
     try {
       // Force refresh the token to get the latest custom claims
       const idTokenResult = await getIdTokenResult(firebaseUserFromListener, true);
       const claims = idTokenResult.claims;
+      console.log('authStore: Fetched ID token. Claims:', claims);
 
       currentUser = {
         uid: firebaseUserFromListener.uid,
-        name: (claims.name as string) || firebaseUserFromListener.displayName,
+        name: (claims.name as string) || firebaseUserFromListener.displayName || firebaseUserFromListener.email, // Fallback to email if name/displayName missing
         email: firebaseUserFromListener.email,
         role: (claims.role as UserRole) || null, // Default to null if no role claim
         assignedBuildingIds: (claims.assignedBuildingIds as string[]) || undefined,
         firebaseUser: firebaseUserFromListener,
       };
-      console.log('authStore: User state updated with custom claims. Role:', currentUser.role);
+      console.log('authStore: User state successfully updated. Role:', currentUser.role, 'Name:', currentUser.name);
 
     } catch (error) {
       console.error("authStore: Error fetching ID token result or processing claims:", error);
       // Fallback to basic info if claims fetching fails
       currentUser = {
         uid: firebaseUserFromListener.uid,
-        name: firebaseUserFromListener.displayName,
+        name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
         role: null, // Could not determine role
+        assignedBuildingIds: undefined,
         firebaseUser: firebaseUserFromListener,
       };
+       console.warn('authStore: User state updated with fallback data due to claims error. Role set to null.');
     }
   } else {
     currentUser = null;
-    console.log('authStore: User state updated to null (logged out).');
+    console.log('authStore: User state updated to null (logged out or no user).');
   }
   notifyListeners();
 };
@@ -62,7 +66,7 @@ if (typeof window !== 'undefined' && !authInitialized) {
     authInitialized = true;
     console.log('authStore: Firebase Auth listener attached.');
   } else {
-    console.warn("authStore: Firebase Auth service is not available. Auth features will be disabled.");
+    console.warn("authStore: Firebase Auth service is not available (auth object is null/undefined from firebaseConfig). Auth features will be disabled.");
     authInitialized = true; // Prevent re-attachment attempts
     updateUserState(null); // Ensure currentUser is null
   }
@@ -92,7 +96,7 @@ export const logoutFirebaseUser = async () => {
 
 export const subscribeToUserChanges = (listener: () => void): (() => void) => {
   listeners.add(listener);
-  // listener(); // Call listener immediately with current state
+  // listener(); // Call listener immediately with current state - careful with React render cycles
   return () => {
     listeners.delete(listener);
   };
@@ -129,30 +133,34 @@ export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): P
 
   // Example of how you might call a Firebase Function (uncomment and configure when ready)
   /*
-  if (!functions) {
-    return { success: false, message: "Firebase Functions not initialized." };
+  if (!auth) { // Or check for Firebase Functions instance if initialized separately
+    return { success: false, message: "Firebase Functions (or auth) not initialized." };
   }
+  const functions = getFunctions(auth.app); // Get functions instance
+
   try {
-    const setUserRoleFunction = httpsCallable<{ targetUid: string; newRole: UserRole }, { success: boolean; message: string }>(functions, 'setUserRole');
-    const result = await setUserRoleFunction({ targetUid, newRole });
+    const setUserRoleFunction = httpsCallable<{ uid: string; role: UserRole }, { message: string }>(functions, 'setUserRole'); // Ensure 'setUserRole' matches your deployed function name
+    const result = await setUserRoleFunction({ uid: targetUid, role: newRole });
     console.log('Firebase Function call result:', result.data);
 
     // IMPORTANT: After a successful role update via custom claims,
     // the user needs a new ID token for the changes to reflect client-side.
-    // This can happen on next login, or you can try to force a token refresh for the *current* user if they are the one being updated.
+    // If updating the *currently logged-in user*, you might force a token refresh:
+    // if (auth.currentUser && auth.currentUser.uid === targetUid) {
+    //   await auth.currentUser.getIdToken(true);
+    // }
     // For other users, they'll see the change on their next login/token refresh.
-    // If the admin is updating their OWN role, they might need to re-login or have their token refreshed.
     
     // To update the local mock list for immediate UI feedback (for demo purposes only):
     const userIndex = MOCK_USERS_FOR_DISPLAY.findIndex(u => u.uid === targetUid);
     if (userIndex > -1) {
       MOCK_USERS_FOR_DISPLAY[userIndex].role = newRole;
-      notifyListeners(); // If any component directly uses MOCK_USERS_FOR_DISPLAY
+      // notifyListeners(); // If any component directly uses MOCK_USERS_FOR_DISPLAY
     }
     // Consider re-fetching the display users list if it were from a backend.
 
-    return { success: result.data.success, message: result.data.message };
-  } catch (error) {
+    return { success: true, message: result.data.message };
+  } catch (error: any) {
     console.error("Error calling setUserRole Firebase Function:", error);
     const httpsError = error as any; // Type assertion for HttpsError
     return { success: false, message: httpsError.message || "Failed to update role via Firebase Function." };
@@ -160,17 +168,13 @@ export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): P
   */
 
   // Simulated success for demo purposes:
-  // In a real app, this success/message would come from your Firebase Function.
-  // Also, you'd likely re-fetch the user list or update the specific user in the local state.
   const userIndex = MOCK_USERS_FOR_DISPLAY.findIndex(u => u.uid === targetUid);
   if (userIndex > -1) {
     MOCK_USERS_FOR_DISPLAY[userIndex].role = newRole;
-    // Note: `notifyListeners()` here would only work if components are subscribing to changes in MOCK_USERS_FOR_DISPLAY directly.
-    // Typically, the `/users` page would re-fetch or manage its own state.
   }
 
   return Promise.resolve({
     success: true,
-    message: `(Simulated) Role for user (UID: ${targetUid}) requested to be ${newRole}. Implement and call your 'setUserRole' Firebase Function. User may need to re-login to see changes reflected in their session.`
+    message: `(Simulated) Role for user (UID: ${targetUid}) requested to be ${newRole}. Implement and call your 'setUserRole' Firebase Function. User may need to re-login or have their token refreshed to see changes reflected in their session.`
   });
 };
