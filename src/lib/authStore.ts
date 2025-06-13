@@ -23,11 +23,19 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
       const claims = idTokenResult.claims;
       console.log('authStore: Fetched ID token. Claims:', claims);
 
+      let determinedRole: UserRole = (claims.role as UserRole) || null;
+
+      // Temporary override for initial admin setup
+      if (firebaseUserFromListener.email === 'admin@example.com' && determinedRole !== 'admin') {
+        console.warn("authStore: Applying temporary client-side 'admin' role for admin@example.com to facilitate initial setup. Please use the User Management page to permanently set this role via the Firebase Function.");
+        determinedRole = 'admin';
+      }
+
       currentUser = {
         uid: firebaseUserFromListener.uid,
         name: (claims.name as string) || firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: (claims.role as UserRole) || null,
+        role: determinedRole,
         assignedBuildingIds: (claims.assignedBuildingIds as string[]) || undefined,
         firebaseUser: firebaseUserFromListener,
       };
@@ -35,15 +43,22 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
 
     } catch (error) {
       console.error("authStore: Error fetching ID token result or processing claims:", error);
+      let fallbackRole: UserRole = null;
+      // Apply temporary override even if claims fail for the bootstrap admin
+      if (firebaseUserFromListener.email === 'admin@example.com') {
+        console.warn("authStore: Claims fetch failed, applying temporary client-side 'admin' role for admin@example.com.");
+        fallbackRole = 'admin';
+      }
+
       currentUser = {
         uid: firebaseUserFromListener.uid,
         name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: null,
+        role: fallbackRole,
         assignedBuildingIds: undefined,
         firebaseUser: firebaseUserFromListener,
       };
-       console.warn('authStore: User state updated with fallback data due to claims error. Role set to null.');
+       console.warn('authStore: User state updated with fallback data. Role set to:', fallbackRole);
     }
   } else {
     currentUser = null;
