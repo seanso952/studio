@@ -74,10 +74,7 @@ export default function UserManagementPage() {
         return;
     }
 
-    // Optimistic UI update or re-fetch can be added here.
-    // For now, we show a toast and rely on potential re-fetch or manual refresh for full list update.
     const originalUsers = [...users];
-    // Optimistically update UI
     setUsers(prevUsers => prevUsers.map(u => u.uid === userId ? {...u, role: newRole} : u));
 
     const result = await requestRoleUpdate(userId, newRole);
@@ -86,18 +83,14 @@ export default function UserManagementPage() {
         title: "Role Update Successful",
         description: result.message,
       });
-      // Optionally re-fetch users to confirm change from backend
-      // This is important if other admins might be making changes
       try {
         const fetchedUsers = await fetchDisplayUsers();
         setUsers(fetchedUsers);
       } catch (err: any) {
-        // If re-fetch fails, revert optimistic update
         setUsers(originalUsers);
         toast({variant: "destructive", title: "UI Revert", description: "Failed to re-sync user list after role change."})
       }
     } else {
-      // Revert optimistic update on failure
       setUsers(originalUsers);
       toast({
         variant: "destructive",
@@ -107,7 +100,7 @@ export default function UserManagementPage() {
     }
   };
 
-  if (appUser && appUser.role !== 'admin' && !isLoading) { // Ensure redirect happens after loading
+  if (appUser && appUser.role !== 'admin' && !isLoading) { 
     return <div className="p-6"><PageHeader title="User Management" /><p>Redirecting...</p></div>;
   }
 
@@ -115,8 +108,8 @@ export default function UserManagementPage() {
     admin: AdminIcon,
     manager: ManagerIcon,
     tenant: TenantIcon,
-    none: ShieldAlert, // For 'none' role or unassigned
-    null: ShieldAlert, // Default for null
+    none: ShieldAlert, 
+    null: ShieldAlert, 
   };
   
   const roleColors: Record<UserRole | string, string> = {
@@ -193,7 +186,7 @@ export default function UserManagementPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={appUser?.uid === user.uid && user.role === 'admin' && !user.disabled}>
+                              <Button variant="ghost" size="icon">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -210,7 +203,6 @@ export default function UserManagementPage() {
                                   {roleOption ? (roleOption.charAt(0).toUpperCase() + roleOption.slice(1)) : 'No Role (None)'}
                                 </DropdownMenuItem>
                               ))}
-                              {/* Add more actions like Disable/Enable user if your backend supports it */}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
