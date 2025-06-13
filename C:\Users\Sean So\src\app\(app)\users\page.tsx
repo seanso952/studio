@@ -267,7 +267,6 @@ export default function UserManagementPage() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              {/* Allow opening menu for self, but disable demotion inside */}
                               <Button variant="ghost" size="icon">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
