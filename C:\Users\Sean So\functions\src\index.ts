@@ -1,10 +1,10 @@
 
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions"; // This is the v2 default export
+import * as functionsV1 from "firebase-functions/v1"; // Explicitly import v1 for v1 features
 import * as admin from "firebase-admin";
 
 // V2 Imports for Callable functions
 import {HttpsError, onCall, CallableRequest} from "firebase-functions/v2/https";
-// V1 Auth triggers are used via the functions.auth namespace
 
 admin.initializeApp();
 
@@ -61,12 +61,12 @@ export const setUserRole = onCall(
 
     try {
       await admin.auth().setCustomUserClaims(uid, {role});
-      functions.logger.info(
+      functions.logger.info( // Using logger from the v2 'functions' import
         `Role '${role}' set for user ${uid} by admin ${request.auth?.uid}`
       );
       return {message: `Role '${role}' has been set for user ${uid}`};
     } catch (error) {
-      functions.logger.error(`Error setting role for user ${uid}:`, error);
+      functions.logger.error(`Error setting role for user ${uid}:`, error); // Using logger from the v2 'functions' import
       if (error instanceof Error) {
         throw new HttpsError(
           "internal", `Failed to set user role: ${error.message}`
@@ -80,15 +80,15 @@ export const setUserRole = onCall(
 );
 
 // Automatically assign a 'tenant' role to every new user - V1 Auth Trigger
-export const assignDefaultRole = functions.auth.user().onCreate(async (user: admin.auth.UserRecord) => {
+export const assignDefaultRole = functionsV1.auth.user().onCreate(async (user: admin.auth.UserRecord) => {
   // 'user' is the UserRecord from firebase-admin/auth
   try {
     await admin.auth().setCustomUserClaims(user.uid, {role: "tenant"});
-    functions.logger.info(
+    functionsV1.logger.info( // Use logger from the v1 functionsV1 import
       `Assigned default 'tenant' role to new user: ${user.uid}`
     );
   } catch (error) {
-    functions.logger.error(
+    functionsV1.logger.error( // Use logger from the v1 functionsV1 import
       `Error assigning default role to user ${user.uid}:`, error
     );
   }
@@ -133,7 +133,7 @@ export const listUsersWithRoles = onCall(
       const allUsers = await listAllUsersRecursively();
       return {users: allUsers};
     } catch (error) {
-      functions.logger.error("Error listing users:", error);
+      functions.logger.error("Error listing users:", error); // Using logger from the v2 'functions' import
       if (error instanceof Error) {
         throw new HttpsError(
           "internal", `Failed to list users: ${error.message}`
