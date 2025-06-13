@@ -11,13 +11,14 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": false,
-    "baseUrl": ".",
+    "baseUrl": "./",
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules"
     ],
     "noImplicitReturns": true,
-    "noUnusedLocals": false
+    "noUnusedLocals": false,
+    "traceResolution": true
   },
   "include": [
     "src/**/*.ts"
