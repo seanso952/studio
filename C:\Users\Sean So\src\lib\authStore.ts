@@ -19,13 +19,16 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
   if (firebaseUserFromListener) {
     console.log(`authStore: Attempting to update state for user: ${firebaseUserFromListener.email}`);
     try {
-      const idTokenResult = await getIdTokenResult(firebaseUserFromListener, true);
+      // Force refresh true to get the latest claims
+      const idTokenResult = await getIdTokenResult(firebaseUserFromListener, true); 
       const claims = idTokenResult.claims;
-      console.log('authStore: Fetched ID token. Claims:', claims);
+
+      console.log('authStore: Fetched ID token. Claims object:', claims);
+      console.log('authStore: Raw claims object from token:', JSON.stringify(claims, null, 2));
+      console.log('authStore: Value of claims.role from token:', claims.role);
+      console.log('authStore: Type of claims.role from token:', typeof claims.role);
 
       const determinedRole: UserRole = (claims.role as UserRole) || null;
-
-      // Removed temporary client-side override for admin@example.com as it should now have the claim from backend.
 
       currentUser = {
         uid: firebaseUserFromListener.uid,
@@ -39,11 +42,11 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
 
     } catch (error) {
       console.error("authStore: Error fetching ID token result or processing claims:", error);
-      currentUser = { // Fallback to basic info if claims fetch fails
+      currentUser = { 
         uid: firebaseUserFromListener.uid,
         name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: null, // No claims, so role is unknown/null
+        role: null, 
         assignedBuildingIds: undefined,
         firebaseUser: firebaseUserFromListener,
       };
@@ -66,8 +69,8 @@ if (typeof window !== 'undefined' && !authInitialized) {
     console.log('authStore: Firebase Auth listener attached.');
   } else {
     console.warn("authStore: Firebase Auth service is not available (auth object is null/undefined from firebaseConfig). Auth features will be disabled.");
-    authInitialized = true; // Mark as initialized to prevent re-attachment attempts
-    updateUserState(null); // Ensure state is cleared
+    authInitialized = true; 
+    updateUserState(null); 
   }
 }
 
@@ -78,16 +81,15 @@ export const getCurrentUser = (): AppUser | null => {
 export const logoutFirebaseUser = async () => {
   if (!auth) {
     console.warn("authStore: Firebase Auth not available. Simulating local logout.");
-    updateUserState(null); // Clear local user state
+    updateUserState(null); 
     return;
   }
   try {
     await firebaseSignOut(auth);
     console.log('authStore: User signed out via Firebase.');
-    // onAuthStateChanged will handle setting currentUser to null via updateUserState
   } catch (error) {
     console.error("authStore: Error signing out from Firebase: ", error);
-    updateUserState(null); // Ensure local state is cleared even on error
+    updateUserState(null); 
   }
 };
 
@@ -107,8 +109,6 @@ export const cleanupAuthListener = () => {
   }
 };
 
-// --- Real User Management Functions ---
-
 interface ListUsersResponse {
   users: DisplayUser[];
 }
@@ -120,7 +120,6 @@ interface SetUserRoleResponse {
   message: string;
 }
 
-// Fetches all users with their roles from the backend
 export const fetchDisplayUsers = async (): Promise<DisplayUser[]> => {
   if (!functions) {
     console.error("authStore.fetchDisplayUsers: Firebase Functions not initialized.");
@@ -133,13 +132,12 @@ export const fetchDisplayUsers = async (): Promise<DisplayUser[]> => {
     return result.data.users;
   } catch (error) {
     console.error("authStore.fetchDisplayUsers: Error calling listUsersWithRoles function:", error);
-    const httpsError = error as any;
+    const httpsError = error as any; 
     const errorMessage = httpsError.message || "Failed to fetch users.";
     throw new Error(errorMessage);
   }
 };
 
-// Requests a role update for a user via the backend
 export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): Promise<{ success: boolean, message: string }> => {
   if (!functions) {
     console.error("authStore.requestRoleUpdate: Firebase Functions not initialized.");
@@ -150,8 +148,9 @@ export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): P
     const result = await setUserRoleFunction({ uid: targetUid, role: newRole });
     console.log('authStore.requestRoleUpdate: setUserRole function call successful:', result.data.message);
     if (auth?.currentUser && auth.currentUser.uid === targetUid) {
-      await getIdTokenResult(auth.currentUser, true);
-      updateUserState(auth.currentUser); 
+      console.log('authStore: Role updated for current user. Forcing token refresh and re-updating user state.');
+      await getIdTokenResult(auth.currentUser, true); // Force refresh
+      updateUserState(auth.currentUser); // Re-process claims and notify listeners
     }
     return { success: true, message: result.data.message };
   } catch (error) {
