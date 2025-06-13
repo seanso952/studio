@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Ensured CardFooter is imported
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react'; // Removed ShieldCheck
 import { fetchDisplayUsers, requestRoleUpdate, getCurrentUser } from '@/lib/authStore';
 import type { AppUser, DisplayUser, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -31,13 +31,12 @@ export default function UserManagementPage() {
   const router = useRouter();
   const appUser = getCurrentUser();
 
-  const [showBootstrapSection, setShowBootstrapSection] = React.useState(false);
-  const [isSettingSelfAsAdmin, setIsSettingSelfAsAdmin] = React.useState(false);
+  // Removed showBootstrapSection and isSettingSelfAsAdmin state as they are no longer needed
 
   const loadUsers = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setShowBootstrapSection(false); // Reset bootstrap section visibility on each load attempt
+    // setShowBootstrapSection(false); // No longer needed
     try {
       const fetchedUsers = await fetchDisplayUsers();
       setUsers(fetchedUsers);
@@ -49,17 +48,15 @@ export default function UserManagementPage() {
         title: "Error Loading Users",
         description: errorMessage,
       });
-      // Check if this is the bootstrap scenario
-      if (appUser?.email === 'admin@example.com' && (errorMessage.includes("permission-denied") || errorMessage.includes("Only admins can list users"))) {
-        setShowBootstrapSection(true);
-      }
+      // Bootstrap section logic removed as admin role is now set via script
     } finally {
       setIsLoading(false);
     }
-  }, [appUser, toast]);
+  }, [toast]); // appUser removed from dependency array as bootstrap logic is gone
 
   React.useEffect(() => {
-    if (appUser && appUser.role !== 'admin' && appUser.email !== 'admin@example.com' /* Allow admin@example.com to see page for bootstrap */) {
+    // If user is not admin, redirect (admin@example.com check for bootstrap no longer needed)
+    if (appUser && appUser.role !== 'admin') {
       toast({
         variant: "destructive",
         title: "Access Denied",
@@ -69,13 +66,15 @@ export default function UserManagementPage() {
       return;
     }
 
-    if (appUser?.role === 'admin' || appUser?.email === 'admin@example.com') {
+    // Only load users if user is admin
+    if (appUser?.role === 'admin') {
       loadUsers();
     }
   }, [appUser, router, toast, loadUsers]);
   
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    if (appUser?.role !== 'admin' && appUser?.email !== 'admin@example.com' /* Allow bootstrap admin to change roles */) {
+    // Standard admin check
+    if (appUser?.role !== 'admin') {
         toast({ variant: "destructive", title: "Permission Denied", description: "Only admins can change user roles."});
         return;
     }
@@ -93,18 +92,14 @@ export default function UserManagementPage() {
         title: "Role Update Successful",
         description: result.message,
       });
-      // If the bootstrap admin just set their own role, reload users to get the fresh list
-      if (appUser?.email === 'admin@example.com' && userId === appUser.uid && newRole === 'admin') {
-        loadUsers(); // This will also hide the bootstrap section
-      } else {
-         try {
-           const fetchedUsers = await fetchDisplayUsers();
-           setUsers(fetchedUsers);
-         } catch (err: any) {
-           setUsers(originalUsers);
-           toast({variant: "destructive", title: "UI Revert", description: "Failed to re-sync user list after role change."})
-         }
-      }
+      // Reload users to reflect the change consistently
+       try {
+         const fetchedUsers = await fetchDisplayUsers();
+         setUsers(fetchedUsers);
+       } catch (err: any) {
+         setUsers(originalUsers); // Revert on error
+         toast({variant: "destructive", title: "UI Revert", description: "Failed to re-sync user list after role change."})
+       }
     } else {
       setUsers(originalUsers);
       toast({
@@ -115,32 +110,10 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleBootstrapSelfAsAdmin = async () => {
-    if (!appUser || appUser.email !== 'admin@example.com') return;
+  // handleBootstrapSelfAsAdmin function removed
 
-    setIsSettingSelfAsAdmin(true);
-    const result = await requestRoleUpdate(appUser.uid, 'admin');
-    if (result.success) {
-      toast({
-        title: "Admin Role Set",
-        description: `Successfully set ${appUser.email} as Admin. User list will now refresh.`,
-      });
-      // The authStore should force a token refresh, then AppShell updates,
-      // then this component's useEffect for appUser might re-trigger loadUsers.
-      // Explicitly reloading users here for good measure after state updates.
-      await loadUsers(); // This will also hide the bootstrap section
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Failed to Set Admin Role",
-        description: result.message,
-      });
-    }
-    setIsSettingSelfAsAdmin(false);
-  };
-
-
-  if (appUser && appUser.role !== 'admin' && appUser.email !== 'admin@example.com' && !isLoading) { 
+  // Redirect if not admin (and not loading) - simplified condition
+  if (appUser && appUser.role !== 'admin' && !isLoading) { 
     return <div className="p-6"><PageHeader title="User Management" /><p>Redirecting...</p></div>;
   }
 
@@ -176,7 +149,8 @@ export default function UserManagementPage() {
         </Card>
       )}
 
-      {error && !isLoading && !showBootstrapSection && (
+      {/* Error display simplified, bootstrap section removed */}
+      {error && !isLoading && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
@@ -184,46 +158,10 @@ export default function UserManagementPage() {
         </Alert>
       )}
 
-      {showBootstrapSection && appUser?.email === 'admin@example.com' && !isLoading && (
-        <Card className="border-primary shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-primary flex items-center">
-              <ShieldCheck className="mr-2 h-6 w-6" />
-              Bootstrap Admin Role
-            </CardTitle>
-            <CardDescription>
-              It seems you ({appUser.email}) might be the initial administrator but your account doesn't have the 'admin' role set in the backend yet.
-              Click the button below to assign the 'admin' role to your account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && <Alert variant="destructive" className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Initial Load Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>}
-            <Button 
-              onClick={handleBootstrapSelfAsAdmin} 
-              disabled={isSettingSelfAsAdmin}
-              className="w-full"
-            >
-              {isSettingSelfAsAdmin ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Setting Role...</>
-              ) : (
-                `Set ${appUser.email} as Admin`
-              )}
-            </Button>
-          </CardContent>
-           <CardFooter>
-            <p className="text-xs text-muted-foreground">
-              After setting the role, the user list should load automatically. If not, please refresh the page.
-            </p>
-          </CardFooter>
-        </Card>
-      )}
+      {/* Bootstrap section entirely removed */}
 
 
-      {!isLoading && !error && !showBootstrapSection && (
+      {!isLoading && !error && ( // Removed !showBootstrapSection condition
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline">System Users</CardTitle>

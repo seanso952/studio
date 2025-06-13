@@ -1,6 +1,5 @@
 
 import * as functions from "firebase-functions"; // This is the v2 default export
-import * as functionsV1 from "firebase-functions/v1"; // Explicitly import v1 for v1 features
 import * as admin from "firebase-admin";
 
 // V2 Imports for Callable functions and Auth triggers
@@ -37,37 +36,19 @@ export const setUserRole = onCall(
   async (request: CallableRequest<SetUserRoleData>) => {
     functions.logger.info("setUserRole: Received data:", JSON.stringify(request.data));
     functions.logger.info("setUserRole: Caller auth object:", JSON.stringify(request.auth));
-    if (request.auth?.token) {
-      functions.logger.info("setUserRole: Caller email from token:", request.auth.token.email);
-      functions.logger.info("setUserRole: Caller UID from token:", request.auth.token.uid);
-      functions.logger.info("setUserRole: Caller admin claim from token:", request.auth.token.admin);
+
+    // Standard security check: only allow admins to call this.
+    // The bootstrap logic is removed as the initial admin is now set.
+    if (request.auth?.token?.admin !== true) {
+      functions.logger.warn(`setUserRole: Permission denied. User ${request.auth?.uid} (email: ${request.auth?.token?.email}) attempted to set role but is not an admin.`);
+      throw new HttpsError(
+        "permission-denied",
+        "Only admins can assign roles."
+      );
     }
+    functions.logger.info(`setUserRole: Admin ${request.auth?.uid} is setting role.`);
 
     const {uid, role} = request.data;
-
-    // Special condition for bootstrapping the first admin.
-    // This allows admin@example.com to set THEIR OWN role to 'admin'
-    // REGARDLESS of their current claims.
-    const isBootstrappingAdminAccount =
-      request.auth?.token?.email === 'admin@example.com' &&
-      uid === request.auth?.uid && // Crucially, they are setting their OWN UID
-      role === 'admin';             // And the role they are setting is 'admin'
-
-    if (isBootstrappingAdminAccount) {
-      functions.logger.info(`setUserRole: Bootstrapping admin role for ${uid}. Proceeding without admin claim check.`);
-      // If this condition is met, we bypass the admin check below.
-    } else {
-      // For ALL OTHER cases (not bootstrapping admin@example.com OR any other user modification),
-      // enforce that the caller must be an admin.
-      if (request.auth?.token?.admin !== true) {
-        functions.logger.warn(`setUserRole: Permission denied. User ${request.auth?.uid} (email: ${request.auth?.token?.email}) attempted to set role for ${uid} but is not an admin and not bootstrapping self.`);
-        throw new HttpsError(
-          "permission-denied",
-          "Only admins can assign roles."
-        );
-      }
-      functions.logger.info(`setUserRole: Admin ${request.auth?.uid} is setting role for ${uid}.`);
-    }
 
     if (!uid || !role) {
       throw new HttpsError(
@@ -87,7 +68,7 @@ export const setUserRole = onCall(
     try {
       await admin.auth().setCustomUserClaims(uid, {role});
       functions.logger.info(
-        `Role '${role}' set for user ${uid} by ${isBootstrappingAdminAccount ? 'bootstrap process' : `admin ${request.auth?.uid}`}`
+        `Role '${role}' set for user ${uid} by admin ${request.auth?.uid}`
       );
       return {message: `Role '${role}' has been set for user ${uid}`};
     } catch (error) {
