@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react'; // Removed ShieldCheck
+import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { fetchDisplayUsers, requestRoleUpdate, getCurrentUser, subscribeToUserChanges } from '@/lib/authStore';
 import type { AppUser, DisplayUser, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -70,12 +70,23 @@ export default function UserManagementPage() {
     }
 
     if (appUser?.role === 'admin') {
-      loadUsers();
-    } else if (appUser === null && !isLoading) { // Explicitly check if appUser is null and not just initial load
-        // This might happen if authStore clears user before this page can redirect
+      // Only call loadUsers if not already loading to prevent multiple calls if appUser reference changes but role is still admin
+      if (!isLoading && users.length === 0 && !error) { // Or some other condition to prevent re-fetching if data is already there
+         loadUsers();
+      } else if (users.length === 0 && error) {
+        // If there was an error previously, and user state changes (e.g. token refresh), try loading again.
+        loadUsers();
+      } else if (users.length === 0 && isLoading) {
+        // If it's already loading, do nothing.
+      } else if (users.length === 0) {
+        // Initial load if no users, no error, not loading
+        loadUsers();
+      }
+    } else if (appUser === null && !isLoading) { 
+        // If user becomes null (logged out) and we are not in an initial page load state, redirect
         router.push('/login');
     }
-  }, [appUser, router, toast, loadUsers, isLoading]);
+  }, [appUser, router, toast, loadUsers, users.length, error, isLoading]); // Dependencies reviewed
   
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     if (appUser?.role !== 'admin') {
@@ -152,7 +163,7 @@ export default function UserManagementPage() {
         description="View users and manage their roles via Firebase Functions."
       />
 
-      {isLoading && appUser?.role === 'admin' && ( // Show loading only if admin is trying to load
+      {isLoading && appUser?.role === 'admin' && ( 
         <Card>
           <CardContent className="p-6 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
