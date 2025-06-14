@@ -17,7 +17,7 @@ const notifyListeners = () => {
 
 const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) => {
   if (firebaseUserFromListener) {
-    console.log(\`authStore: Attempting to update state for user: \${firebaseUserFromListener.email}\`);
+    console.log(`authStore: Attempting to update state for user: ${firebaseUserFromListener.email}`);
     try {
       // Force refresh true to get the latest claims
       const idTokenResult = await getIdTokenResult(firebaseUserFromListener, true); 
@@ -156,6 +156,6 @@ export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): P
   } catch (error) {
     console.error("authStore.requestRoleUpdate: Error calling setUserRole function:", error);
     const httpsError = error as any;
-    return { success: false, message: httpsError.message || \`Failed to update role for UID \${targetUid}.\` };
+    return { success: false, message: httpsError.message || `Failed to update role for UID ${targetUid}.` };
   }
 };
