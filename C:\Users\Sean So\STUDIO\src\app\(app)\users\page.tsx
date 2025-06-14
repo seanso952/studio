@@ -71,7 +71,7 @@ export default function UserManagementPage() {
 
     if (appUser?.role === 'admin') {
       // Only call loadUsers if not already loading to prevent multiple calls if appUser reference changes but role is still admin
-      if (!isLoading && users.length === 0 && !error) { // Or some other condition to prevent re-fetching if data is already there
+      if (!isLoading && users.length === 0 && !error) { 
          loadUsers();
       } else if (users.length === 0 && error) {
         // If there was an error previously, and user state changes (e.g. token refresh), try loading again.
@@ -86,7 +86,9 @@ export default function UserManagementPage() {
         // If user becomes null (logged out) and we are not in an initial page load state, redirect
         router.push('/login');
     }
-  }, [appUser, router, toast, loadUsers, users.length, error, isLoading]); // Dependencies reviewed
+  // Removed isLoading from dependency array to prevent loop on error
+  // Added users.length and error to re-evaluate if those change and an initial load might be needed.
+  }, [appUser, router, toast, loadUsers, users.length, error]); 
   
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     if (appUser?.role !== 'admin') {
@@ -125,9 +127,6 @@ export default function UserManagementPage() {
   };
 
   if (!appUser && !isLoading) {
-    // This case implies user is null and we are not in an initial loading phase.
-    // AppShell or the effect above should handle redirection to login.
-    // Showing a minimal loading or redirecting indicator here.
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -262,3 +261,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+    

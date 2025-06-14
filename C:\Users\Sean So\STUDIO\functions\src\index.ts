@@ -72,8 +72,7 @@ export const setUserRole = onCall(
         claimsToSet.admin = true; // For request.auth.token.admin compatibility
       } else {
         // Ensure admin claim is removed if role is not admin
-        claimsToSet.admin = false; // Or delete it: claimsToSet.admin = null; or handle in client if undefined is preferred.
-                                   // For simplicity, setting to false. Firebase might treat `null` as delete.
+        claimsToSet.admin = false; 
       }
       await admin.auth().setCustomUserClaims(uid, claimsToSet);
       functions.logger.info(
@@ -163,3 +162,5 @@ export const listUsersWithRoles = onCall(
     }
   }
 );
+
+    
