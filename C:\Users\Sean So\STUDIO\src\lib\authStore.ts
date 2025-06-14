@@ -46,7 +46,7 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
         uid: firebaseUserFromListener.uid,
         name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: null, 
+        role: null, // Fallback to null if claims processing fails
         assignedBuildingIds: undefined,
         firebaseUser: firebaseUserFromListener,
       };
