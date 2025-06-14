@@ -1,9 +1,9 @@
 
 'use client';
 
-import { auth, functions } from './firebaseConfig';
+import { auth, functions } from './firebaseConfig'; // Import functions
 import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser, getIdTokenResult } from 'firebase/auth';
-import { httpsCallable, type HttpsCallable } from 'firebase/functions';
+import { httpsCallable, type HttpsCallable } from 'firebase/functions'; // For calling Firebase Functions
 import type { AppUser, UserRole, DisplayUser } from './types';
 
 let currentUser: AppUser | null = null;
@@ -46,7 +46,7 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
         uid: firebaseUserFromListener.uid,
         name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: null, 
+        role: null, // Fallback to null if claims processing fails
         assignedBuildingIds: undefined,
         firebaseUser: firebaseUserFromListener,
       };

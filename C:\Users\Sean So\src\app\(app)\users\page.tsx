@@ -15,8 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react'; // Removed ShieldCheck
-import { fetchDisplayUsers, requestRoleUpdate, getCurrentUser } from '@/lib/authStore';
+import { MoreHorizontal, Edit, ShieldAlert, UserCog as ManagerIcon, UserCheck as TenantIcon, UserCog as AdminIcon, Loader2, AlertTriangle } from 'lucide-react';
+import { fetchDisplayUsers, requestRoleUpdate, getCurrentUser, subscribeToUserChanges } from '@/lib/authStore';
 import type { AppUser, DisplayUser, UserRole } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -29,14 +29,19 @@ export default function UserManagementPage() {
   const [error, setError] = React.useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const appUser = getCurrentUser();
+  const [appUser, setAppUserLocal] = React.useState<AppUser | null>(getCurrentUser());
 
-  // Removed showBootstrapSection and isSettingSelfAsAdmin state as they are no longer needed
+  React.useEffect(() => {
+    const unsubscribe = subscribeToUserChanges(() => {
+      setAppUserLocal(getCurrentUser());
+    });
+    return unsubscribe;
+  }, []);
+
 
   const loadUsers = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    // setShowBootstrapSection(false); // No longer needed
     try {
       const fetchedUsers = await fetchDisplayUsers();
       setUsers(fetchedUsers);
@@ -48,14 +53,12 @@ export default function UserManagementPage() {
         title: "Error Loading Users",
         description: errorMessage,
       });
-      // Bootstrap section logic removed as admin role is now set via script
     } finally {
       setIsLoading(false);
     }
-  }, [toast]); // appUser removed from dependency array as bootstrap logic is gone
+  }, [toast]);
 
   React.useEffect(() => {
-    // If user is not admin, redirect (admin@example.com check for bootstrap no longer needed)
     if (appUser && appUser.role !== 'admin') {
       toast({
         variant: "destructive",
@@ -66,14 +69,28 @@ export default function UserManagementPage() {
       return;
     }
 
-    // Only load users if user is admin
     if (appUser?.role === 'admin') {
-      loadUsers();
+      // Only call loadUsers if not already loading to prevent multiple calls if appUser reference changes but role is still admin
+      if (!isLoading && users.length === 0 && !error) { 
+         loadUsers();
+      } else if (users.length === 0 && error) {
+        // If there was an error previously, and user state changes (e.g. token refresh), try loading again.
+        loadUsers();
+      } else if (users.length === 0 && isLoading) {
+        // If it's already loading, do nothing.
+      } else if (users.length === 0) {
+        // Initial load if no users, no error, not loading
+        loadUsers();
+      }
+    } else if (appUser === null && !isLoading) { 
+        // If user becomes null (logged out) and we are not in an initial page load state, redirect
+        router.push('/login');
     }
-  }, [appUser, router, toast, loadUsers]);
+  // Removed isLoading from dependency array to prevent loop on error
+  // Added users.length and error to re-evaluate if those change and an initial load might be needed.
+  }, [appUser, router, toast, loadUsers, users.length, error]); 
   
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    // Standard admin check
     if (appUser?.role !== 'admin') {
         toast({ variant: "destructive", title: "Permission Denied", description: "Only admins can change user roles."});
         return;
@@ -92,7 +109,6 @@ export default function UserManagementPage() {
         title: "Role Update Successful",
         description: result.message,
       });
-      // Reload users to reflect the change consistently
        try {
          const fetchedUsers = await fetchDisplayUsers();
          setUsers(fetchedUsers);
@@ -110,11 +126,17 @@ export default function UserManagementPage() {
     }
   };
 
-  // handleBootstrapSelfAsAdmin function removed
-
-  // Redirect if not admin (and not loading) - simplified condition
+  if (!appUser && !isLoading) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2 text-muted-foreground">Loading user data...</p>
+        </div>
+    );
+  }
+  
   if (appUser && appUser.role !== 'admin' && !isLoading) { 
-    return <div className="p-6"><PageHeader title="User Management" /><p>Redirecting...</p></div>;
+    return <div className="p-6"><PageHeader title="User Management" /><p className="text-muted-foreground">Redirecting...</p></div>;
   }
 
   const roleIcons: Record<UserRole | string, React.ElementType> = {
@@ -140,7 +162,7 @@ export default function UserManagementPage() {
         description="View users and manage their roles via Firebase Functions."
       />
 
-      {isLoading && (
+      {isLoading && appUser?.role === 'admin' && ( 
         <Card>
           <CardContent className="p-6 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
@@ -149,7 +171,6 @@ export default function UserManagementPage() {
         </Card>
       )}
 
-      {/* Error display simplified, bootstrap section removed */}
       {error && !isLoading && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -158,10 +179,7 @@ export default function UserManagementPage() {
         </Alert>
       )}
 
-      {/* Bootstrap section entirely removed */}
-
-
-      {!isLoading && !error && ( // Removed !showBootstrapSection condition
+      {!isLoading && !error && appUser?.role === 'admin' && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline">System Users</CardTitle>
@@ -231,7 +249,7 @@ export default function UserManagementPage() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No users found or an error occurred.</p>
+              <p className="text-muted-foreground text-center py-4">No users found or an error occurred while fetching.</p>
             )}
              <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
               <strong>Note:</strong> User role modifications call a backend Firebase Function.
