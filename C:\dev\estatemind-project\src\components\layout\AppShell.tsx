@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -41,7 +42,6 @@ import {
 import { cn } from '@/lib/utils';
 import { getCurrentUser, logoutFirebaseUser, subscribeToUserChanges } from '@/lib/authStore';
 import type { AppUser } from '@/lib/types';
-import { auth } from '@/lib/firebaseConfig';
 
 const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -71,11 +71,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
 
     const initialUser = getCurrentUser();
-    setAppUserLocal(initialUser);
-    
-    if (auth?.currentUser) {
+    if (initialUser) {
+        setAppUserLocal(initialUser);
         setAuthLoading(false);
+    } else {
+        // This helps resolve the initial loading state faster if auth is already known to be null
+        const authLib = require('@/lib/firebaseConfig').auth;
+        if(authLib && authLib.currentUser === null){
+            setAuthLoading(false);
+        }
     }
+
 
     return () => unsubscribe();
   }, []);

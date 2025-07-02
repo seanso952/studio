@@ -1,3 +1,4 @@
+
 import * as functionsV1 from "firebase-functions/v1";
 import * as functionsV2 from "firebase-functions/v2";
 import * as admin from "firebase-admin";
@@ -46,7 +47,7 @@ export const setUserRole = functionsV2.https.onCall(
     }
 
     const { uid, role } = request.data;
-    const validRoles = ["admin", "manager", "tenant", "none", null];
+    const validRoles = ["admin", "manager", "tenant", "none"];
     if (!uid || !validRoles.includes(role)) {
       throw new functionsV2.https.HttpsError(
         "invalid-argument",

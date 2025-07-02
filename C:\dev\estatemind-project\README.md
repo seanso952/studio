@@ -1,3 +1,4 @@
+
 # EstateMind - Real Estate Management Platform
 
 This is a Next.js application built with Firebase Studio.

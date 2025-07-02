@@ -1,3 +1,4 @@
+
 'use client';
 
 import { auth, functions } from './firebaseConfig';
