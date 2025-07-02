@@ -1,76 +1,63 @@
 
 'use client';
 
-import { auth, functions } from './firebaseConfig'; // Import functions
+import { auth, functions } from './firebaseConfig';
 import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser, getIdTokenResult } from 'firebase/auth';
-import { httpsCallable, type HttpsCallable } from 'firebase/functions'; // For calling Firebase Functions
+import { httpsCallable, type HttpsCallable } from 'firebase/functions';
 import type { AppUser, UserRole, DisplayUser } from './types';
 
 let currentUser: AppUser | null = null;
-const listeners: Set<() => void> = new Set();
+const listeners: Set<(user: AppUser | null) => void> = new Set();
 let authListenerUnsubscribe: (() => void) | null = null;
 let authInitialized = false;
 
 const notifyListeners = () => {
-  listeners.forEach(listener => listener());
+  listeners.forEach(listener => listener(currentUser));
 };
 
-const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) => {
-  if (firebaseUserFromListener) {
-    console.log(`authStore: Attempting to update state for user: ${firebaseUserFromListener.email}`);
+const updateUserState = async (firebaseUser: FirebaseUser | null) => {
+  if (firebaseUser) {
     try {
-      // Force refresh true to get the latest claims
-      const idTokenResult = await getIdTokenResult(firebaseUserFromListener, true); 
+      const idTokenResult = await getIdTokenResult(firebaseUser, true); 
       const claims = idTokenResult.claims;
-
-      console.log('authStore: Fetched ID token. Claims object:', claims);
-      console.log('authStore: Raw claims object from token:', JSON.stringify(claims, null, 2));
-      console.log('authStore: Value of claims.role from token:', claims.role);
-      console.log('authStore: Type of claims.role from token:', typeof claims.role);
+      console.log('authStore: Fetched ID token. Claims:', claims);
 
       const determinedRole: UserRole = (claims.role as UserRole) || null;
 
       currentUser = {
-        uid: firebaseUserFromListener.uid,
-        name: (claims.name as string) || firebaseUserFromListener.displayName || firebaseUserFromListener.email,
-        email: firebaseUserFromListener.email,
+        uid: firebaseUser.uid,
+        name: (claims.name as string) || firebaseUser.displayName || firebaseUser.email,
+        email: firebaseUser.email,
         role: determinedRole,
         assignedBuildingIds: (claims.assignedBuildingIds as string[]) || undefined,
-        firebaseUser: firebaseUserFromListener,
+        firebaseUser: firebaseUser,
       };
-      console.log('authStore: User state successfully updated. Role:', currentUser.role, 'Name:', currentUser.name);
-
+      console.log('authStore: User state updated. Role:', currentUser.role);
     } catch (error) {
-      console.error("authStore: Error fetching ID token result or processing claims:", error);
+      console.error("authStore: Error fetching ID token result:", error);
       currentUser = { 
-        uid: firebaseUserFromListener.uid,
-        name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
-        email: firebaseUserFromListener.email,
-        role: null, // Fallback to null if claims processing fails
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email,
+        email: firebaseUser.email,
+        role: null,
         assignedBuildingIds: undefined,
-        firebaseUser: firebaseUserFromListener,
+        firebaseUser: firebaseUser,
       };
-       console.warn('authStore: User state updated with fallback data due to claims processing error. Role set to null.');
     }
   } else {
     currentUser = null;
-    console.log('authStore: User state updated to null (logged out or no user).');
+    console.log('authStore: User state updated to null.');
   }
   notifyListeners();
 };
 
 if (typeof window !== 'undefined' && !authInitialized) {
   if (auth) {
-    authListenerUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      console.log('authStore: onAuthStateChanged triggered. Firebase User:', firebaseUser ? firebaseUser.email : 'null');
-      updateUserState(firebaseUser);
-    });
+    authListenerUnsubscribe = onAuthStateChanged(auth, updateUserState);
     authInitialized = true;
     console.log('authStore: Firebase Auth listener attached.');
   } else {
-    console.warn("authStore: Firebase Auth service is not available (auth object is null/undefined from firebaseConfig). Auth features will be disabled.");
-    authInitialized = true; 
-    updateUserState(null); 
+    console.warn("authStore: Firebase Auth service not available.");
   }
 }
 
@@ -79,34 +66,17 @@ export const getCurrentUser = (): AppUser | null => {
 };
 
 export const logoutFirebaseUser = async () => {
-  if (!auth) {
-    console.warn("authStore: Firebase Auth not available. Simulating local logout.");
-    updateUserState(null); 
-    return;
-  }
+  if (!auth) return;
   try {
     await firebaseSignOut(auth);
-    console.log('authStore: User signed out via Firebase.');
   } catch (error) {
-    console.error("authStore: Error signing out from Firebase: ", error);
-    updateUserState(null); 
+    console.error("authStore: Error signing out:", error);
   }
 };
 
-export const subscribeToUserChanges = (listener: () => void): (() => void) => {
+export const subscribeToUserChanges = (listener: (user: AppUser | null) => void): (() => void) => {
   listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-
-export const cleanupAuthListener = () => {
-  if (authListenerUnsubscribe) {
-    authListenerUnsubscribe();
-    authListenerUnsubscribe = null;
-    authInitialized = false;
-    console.log('authStore: Firebase Auth listener cleaned up.');
-  }
+  return () => listeners.delete(listener);
 };
 
 interface ListUsersResponse {
@@ -121,41 +91,28 @@ interface SetUserRoleResponse {
 }
 
 export const fetchDisplayUsers = async (): Promise<DisplayUser[]> => {
-  if (!functions) {
-    console.error("authStore.fetchDisplayUsers: Firebase Functions not initialized.");
-    throw new Error("Firebase Functions service is not available.");
-  }
+  if (!functions) throw new Error("Firebase Functions service is not available.");
   try {
     const listUsersWithRolesFunction: HttpsCallable<unknown, ListUsersResponse> = httpsCallable(functions, 'listUsersWithRoles');
     const result = await listUsersWithRolesFunction();
-    console.log("authStore.fetchDisplayUsers: Successfully fetched users:", result.data.users.length);
     return result.data.users;
-  } catch (error) {
-    console.error("authStore.fetchDisplayUsers: Error calling listUsersWithRoles function:", error);
-    const httpsError = error as any; 
-    const errorMessage = httpsError.message || "Failed to fetch users.";
-    throw new Error(errorMessage);
+  } catch (error: any) {
+    console.error("authStore.fetchDisplayUsers error:", error);
+    throw new Error(error.message || "Failed to fetch users.");
   }
 };
 
 export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): Promise<{ success: boolean, message: string }> => {
-  if (!functions) {
-    console.error("authStore.requestRoleUpdate: Firebase Functions not initialized.");
-    return { success: false, message: "Firebase Functions service is not available." };
-  }
+  if (!functions) return { success: false, message: "Firebase Functions service is not available." };
   try {
     const setUserRoleFunction: HttpsCallable<SetUserRoleData, SetUserRoleResponse> = httpsCallable(functions, 'setUserRole');
     const result = await setUserRoleFunction({ uid: targetUid, role: newRole });
-    console.log('authStore.requestRoleUpdate: setUserRole function call successful:', result.data.message);
     if (auth?.currentUser && auth.currentUser.uid === targetUid) {
-      console.log('authStore: Role updated for current user. Forcing token refresh and re-updating user state.');
-      await getIdTokenResult(auth.currentUser, true); // Force refresh
-      updateUserState(auth.currentUser); // Re-process claims and notify listeners
+      updateUserState(auth.currentUser);
     }
     return { success: true, message: result.data.message };
-  } catch (error) {
-    console.error("authStore.requestRoleUpdate: Error calling setUserRole function:", error);
-    const httpsError = error as any;
-    return { success: false, message: httpsError.message || `Failed to update role for UID ${targetUid}.` };
+  } catch (error: any) {
+    console.error("authStore.requestRoleUpdate error:", error);
+    return { success: false, message: error.message || `Failed to update role for UID ${targetUid}.` };
   }
 };

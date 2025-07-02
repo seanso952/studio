@@ -1,6 +1,5 @@
 
-// @/components/layout/AppShell.tsx
-"use client";
+'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -37,16 +36,13 @@ import {
   Settings,
   LogOut,
   Landmark,
-  UserSquare,
-  ShieldCheck,
-  Briefcase,
-  Loader2,
   UserCog,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCurrentUser, logoutFirebaseUser, subscribeToUserChanges } from '@/lib/authStore';
 import type { AppUser } from '@/lib/types';
-import { auth } from '@/lib/firebaseConfig'; // Import auth for explicit check
+import { auth } from '@/lib/firebaseConfig';
 
 const navItemsBase = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -61,6 +57,7 @@ const adminOnlyNavItems = [
   { href: '/contract-analysis', label: 'Contract Analysis', icon: FileClock },
 ];
 
+const publicRoutes = ['/login', '/logout'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -68,82 +65,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [appUser, setAppUserLocal] = React.useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = React.useState(true);
 
-
   React.useEffect(() => {
-    const initialUserFromStore = getCurrentUser();
-    if (initialUserFromStore) {
-      setAppUserLocal(initialUserFromStore);
-      setAuthLoading(false); 
-    }
-
-    const unsubscribe = subscribeToUserChanges(() => {
-      const user = getCurrentUser();
-      console.log('AppShell: User state updated via subscription. User:', user ? user.email : 'null', 'Role:', user?.role);
+    const unsubscribe = subscribeToUserChanges((user) => {
       setAppUserLocal(user);
       setAuthLoading(false);
-
-      if (!auth) {
-          console.error("AppShell: Firebase Auth service is not available. Redirecting to login.");
-          if (pathname !== '/login' && pathname !== '/logout') {
-            router.push('/login');
-          }
-          return;
-      }
-      
-      if (!user && pathname !== '/login' && pathname !== '/logout') {
-        console.log('AppShell: No user from subscription, redirecting to /login.');
-        router.push('/login');
-      }
     });
 
-    // Initial check after mount for scenarios where store might not be populated yet
-    // but Firebase Auth object might be.
-    if (!initialUserFromStore) {
-      if (auth && auth.currentUser) {
-        // If auth.currentUser exists but store is null, onAuthStateChanged should soon update the store.
-        // We set authLoading to false if it's clear there's no user, or wait for onAuthStateChanged.
-        console.log('AppShell: auth.currentUser exists on mount, waiting for authStore update.');
-        // authLoading remains true, allowing onAuthStateChanged to populate and then setAuthLoading(false)
-      } else {
-         // No user in Firebase (auth.currentUser is null) or auth service unavailable, and not in local store
-         setAuthLoading(false); 
-         if (pathname !== '/login' && pathname !== '/logout') {
-            console.log('AppShell: No initial user from store or Firebase (auth.currentUser is null). Redirecting to /login.');
-            router.push('/login');
-         }
-      }
-    }
+    // Handle initial state
+    const initialUser = getCurrentUser();
+    setAppUserLocal(initialUser);
+    setAuthLoading(false);
 
     return () => unsubscribe();
-  }, [pathname, router]); 
+  }, []);
+
+  React.useEffect(() => {
+    if (!authLoading && !appUser && !publicRoutes.includes(pathname)) {
+      router.push('/login');
+    }
+  }, [authLoading, appUser, pathname, router]);
 
   const handleLogout = async () => {
     await logoutFirebaseUser();
     router.push('/logout'); 
   };
-
-   const handleRoleSwitchSimulate = (rolePath: string) => {
-    // This is purely for simulating UI, actual access is controlled by role
-    if (rolePath === '/portal/dashboard' && appUser?.role !== 'tenant') {
-        alert("To access the tenant portal, please log in with a tenant account (e.g., one with a 'tenant' custom claim). This button is for UI simulation.");
-        return;
-    }
-    if ((rolePath === '/dashboard') && appUser?.role === 'tenant'){
-        alert("Tenants cannot access the admin/manager dashboard. Please log out and log in with an admin/manager account. This button is for UI simulation.");
-        return;
-    }
-    router.push(rolePath);
-  };
-
-  let navItems = navItemsBase;
-  if (appUser?.role === 'admin') {
-    navItems = [...navItemsBase, ...adminOnlyNavItems];
-  } else if (appUser?.role === 'manager') {
-    navItems = navItemsBase.map(item => item.href === '/properties' ? {...item, label: 'My Properties'} : item);
+  
+  if (publicRoutes.includes(pathname)) {
+    return <>{children}</>;
   }
 
-
-  if (authLoading && pathname !== '/login' && pathname !== '/logout') {
+  if (authLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -152,22 +103,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!appUser && (pathname === '/login' || pathname === '/logout')) {
-    return <>{children}</>; 
-  }
-  
-  // If appUser is null here, it means we are on /login or /logout and should render children without AppShell
-  // or authLoading is false, and user is still null (redirection should have happened).
   if (!appUser) {
-    // This case should ideally not be reached for protected routes due to the useEffect logic.
-    // If it is, it implies we are on /login or /logout page, or a redirect is in progress/failed.
-    // Render children directly (which would be the login/logout page or a redirecting state).
-    console.log('AppShell: Render - No appUser. Path:', pathname);
-    return <>{children}</>;
+    // This case should be handled by the redirect effect, but as a fallback:
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Redirecting to login...</p>
+      </div>
+    );
   }
 
+  let navItems = navItemsBase;
+  if (appUser?.role === 'admin') {
+    navItems = [...navItemsBase, ...adminOnlyNavItems];
+  } else if (appUser?.role === 'manager') {
+    navItems = navItemsBase; // Customize for manager if needed
+  }
 
-  // If user is available, render AppShell
   return (
     <SidebarProvider defaultOpen>
       <div className="flex min-h-screen">
@@ -219,15 +171,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent side="right" align="start" className="w-56">
                 <DropdownMenuLabel>{appUser.name || appUser.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                 <DropdownMenuItem onClick={() => handleRoleSwitchSimulate('/dashboard')} disabled={appUser.role === 'admin' || appUser.role === 'manager'}>
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  <span>Admin/Manager View</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleRoleSwitchSimulate('/portal/dashboard')} disabled={appUser.role === 'tenant'}>
-                  <UserSquare className="mr-2 h-4 w-4" />
-                  <span>Tenant Portal View</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem disabled>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
@@ -241,20 +184,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset className={cn(
-            "flex-1 flex flex-col",
-            "bg-background"
-        )}>
+        <SidebarInset className={cn("flex-1 flex flex-col", "bg-background")}>
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-6 shadow-sm">
             <SidebarTrigger className="md:hidden" />
-            <div className="flex-1">
-              {/* Can add breadcrumbs or page title here if needed */}
-            </div>
+            <div className="flex-1" />
           </header>
-          <main className={cn(
-            "flex-1 overflow-y-auto",
-            "p-4 md:p-6 lg:p-8" 
-            )}>
+          <main className={cn("flex-1 overflow-y-auto", "p-4 md:p-6 lg:p-8")}>
             {children}
           </main>
         </SidebarInset>

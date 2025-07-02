@@ -2,31 +2,18 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "es2022",
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
+    "target": "es2022",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": false,
-    "baseUrl": "./",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules"
-    ],
-    "noImplicitReturns": true,
-    "noUnusedLocals": false,
-    "traceResolution": true
+    "forceConsistentCasingInFileNames": true
   },
+  "compileOnSave": true,
   "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "lib"
-  ],
-  "compileOnSave": true
+    "src"
+  ]
 }

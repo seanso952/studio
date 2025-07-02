@@ -7,8 +7,8 @@ export interface Repair {
   description: string;
   cost: number;
   unitId: string;
-  unitNumber?: string; // For display
-  buildingName?: string; // For display
+  unitNumber?: string;
+  buildingName?: string;
 }
 
 export type TenantType = 'receipted' | 'non-receipted';
@@ -19,8 +19,8 @@ export interface Tenant {
   email: string;
   phone: string;
   unitId: string;
-  unitNumber?: string; // For display
-  buildingName?: string; // For display
+  unitNumber?: string;
+  buildingName?: string;
   contractStartDate: string;
   contractEndDate: string;
   rentAmount: number;
@@ -56,7 +56,6 @@ export interface Building {
 export type BillStatus = 'pending' | 'approved' | 'rejected' | 'paid';
 export type BillType = 'electricity' | 'water' | 'association_dues' | 'rent' | 'other';
 
-
 export interface BillPayment {
   id: string;
   tenantId: string;
@@ -88,36 +87,23 @@ export interface BouncedCheck {
   notes?: string;
 }
 
-export interface DocumentSummary {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  documentType: 'receipt' | '2307';
-  documentName: string;
-  submissionDate: string;
-  url: string;
-}
+export type UserRole = 'admin' | 'manager' | 'tenant' | null;
 
-export type UserRole = 'admin' | 'manager' | 'tenant' | 'none' | null; // Added 'none' for unassigned roles from backend
-
-// Represents the user state in the application, derived from Firebase Auth and Custom Claims
 export interface AppUser {
-  uid: string; // Firebase UID
-  name: string | null; // From custom claim 'name' or FirebaseUser displayName
+  uid: string;
+  name: string | null;
   email: string | null;
-  role: UserRole; // From custom claim 'role'
-  assignedBuildingIds?: string[]; // From custom claim 'assignedBuildingIds' (for managers)
-  firebaseUser: FirebaseUser; // The raw Firebase user object
+  role: UserRole;
+  assignedBuildingIds?: string[];
+  firebaseUser: FirebaseUser;
 }
 
-// For displaying users in user management page (now matches listUsersWithRoles function)
 export interface DisplayUser {
   uid: string;
-  email?: string; // Email can be optional if not always returned or available
+  email?: string;
   displayName?: string;
-  role: UserRole; // This comes from customClaims.role
+  role: UserRole;
   disabled: boolean;
   creationTime: string;
   lastSignInTime: string;
-  // Add other fields from your listUsersWithRoles function as needed
 }
