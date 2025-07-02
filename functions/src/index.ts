@@ -1,7 +1,7 @@
 
 import * as admin from "firebase-admin";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { onUserCreated } from "firebase-functions/v2/auth";
+import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { onUserCreated, type AuthEvent } from "firebase-functions/v2/auth";
 import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
@@ -35,7 +35,7 @@ interface UserListUserData {
 
 // --- setUserRole (v2 callable) ---
 export const setUserRole = onCall<SetUserRoleData>(
-  async (request) => {
+  async (request: CallableRequest<SetUserRoleData>) => {
     // must be logged in
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Must be logged in.");
@@ -81,20 +81,21 @@ export const setUserRole = onCall<SetUserRoleData>(
 );
 
 // --- assignDefaultRole (v2 auth trigger) ---
-export const assignDefaultRole = onUserCreated((event) => {
+export const assignDefaultRole = onUserCreated(async (event: AuthEvent) => {
   const user = event.data;
-  admin
-    .auth()
-    .setCustomUserClaims(user.uid, { role: "tenant", admin: false })
-    .then(() =>
-      logger.info(`Default 'tenant' claim set for new user ${user.uid}`)
-    )
-    .catch((e) => logger.error(`Could not set default role:`, e));
+  try {
+    await admin
+      .auth()
+      .setCustomUserClaims(user.uid, { role: "tenant", admin: false });
+    logger.info(`Default 'tenant' claim set for new user ${user.uid}`);
+  } catch(e) {
+    logger.error(`Could not set default role for user ${user.uid}:`, e);
+  }
 });
 
 // --- listUsersWithRoles (v2 callable) ---
 export const listUsersWithRoles = onCall<UserListUserData>(
-  async (request) => {
+  async (request: CallableRequest<UserListUserData>) => {
     if (request.auth?.token.admin !== true) {
       throw new HttpsError("permission-denied", "Only admins may list users.");
     }
@@ -104,7 +105,7 @@ export const listUsersWithRoles = onCall<UserListUserData>(
       acc: DisplayUser[] = []
     ): Promise<DisplayUser[]> => {
       const res = await admin.auth().listUsers(1000, nextPage);
-      const batch = res.users.map((u) => ({
+      const batch = res.users.map((u: admin.auth.UserRecord) => ({
         uid: u.uid,
         email: u.email,
         displayName: u.displayName,
