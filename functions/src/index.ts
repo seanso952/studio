@@ -41,8 +41,13 @@ interface UserListUserData {
 // Callable function to set a user's role (e.g., 'admin', 'manager', etc.) - v2
 export const setUserRole = onCall(
   async (request: CallableRequest<SetUserRoleData>) => {
-    const {uid, role} = request.data;
+    // onCall implicitly checks for authentication. If !request.auth, it throws 'unauthenticated'.
+    if (!request.auth) {
+        // This is a defensive check; onCall should handle this.
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
 
+    const {uid, role} = request.data;
     if (!uid || !role) {
       throw new HttpsError(
         "invalid-argument",
@@ -50,22 +55,25 @@ export const setUserRole = onCall(
       );
     }
     
-    // --- Bootstrap Logic ---
-    // Fetch the user record for the user whose role is being changed.
-    const userToModify = await admin.auth().getUser(uid);
-    // This condition allows 'admin@example.com' to have their own role set to 'admin'
-    // without the requester needing to be an admin already. This is the bootstrap mechanism.
-    const isBootstrapAdminSelfPromotion = userToModify.email === 'admin@example.com' && role === 'admin' && request.auth?.uid === uid;
-
-    // Security check:
-    // Requester must be an admin, UNLESS it's the bootstrap case.
-    if (!isBootstrapAdminSelfPromotion && request.auth?.token.admin !== true) {
-      throw new HttpsError(
-        "permission-denied",
-        "Only admins can assign roles."
-      );
+    // --- Refactored Security Check ---
+    const isRequesterAdmin = request.auth.token.admin === true;
+    
+    // If the requester is an admin, they are authorized.
+    // If not, we check for the special bootstrap case.
+    if (!isRequesterAdmin) {
+        const userToModify = await admin.auth().getUser(uid);
+        const isBootstrapSelfPromotion = 
+            userToModify.email === 'admin@example.com' &&
+            role === 'admin' &&
+            request.auth.uid === uid;
+        
+        // If not an admin AND not the valid bootstrap case, deny permission.
+        if (!isBootstrapSelfPromotion) {
+            throw new HttpsError( "permission-denied", "Only admins can assign roles." );
+        }
     }
-
+    
+    // --- Main Logic (authorized to proceed) ---
     const validRoles: Exclude<UserRole, null>[] = ["admin", "manager", "tenant", "none"];
     if (!validRoles.includes(role)) {
       throw new HttpsError(
@@ -75,13 +83,14 @@ export const setUserRole = onCall(
     }
 
     try {
+      // Set both 'role' and 'admin' claims for consistency
       await admin.auth().setCustomUserClaims(uid, { role, admin: role === 'admin' });
-      logger.info( // Using logger from the v2 'logger' import
-        `Role '${role}' set for user ${uid} by admin ${request.auth?.uid}`
+      logger.info(
+        `Role '${role}' set for user ${uid} by requester ${request.auth.uid}`
       );
       return {message: `Role '${role}' has been set for user ${uid}`};
     } catch (error) {
-      logger.error(`Error setting role for user ${uid}:`, error); // Using logger from the v2 'logger' import
+      logger.error(`Error setting role for user ${uid}:`, error);
       if (error instanceof Error) {
         throw new HttpsError(
           "internal", `Failed to set user role: ${error.message}`
