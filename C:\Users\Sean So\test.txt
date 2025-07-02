@@ -1,0 +1,1 @@
+This is a test file to confirm that file synchronization is working correctly while the local development server is stopped. If you can see this file, the test was successful.
