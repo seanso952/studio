@@ -1,8 +1,8 @@
 
 import * as admin from "firebase-admin";
-import * as functionsV1 from "firebase-functions/v1";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onUserCreated } from "firebase-functions/v2/auth";
 import * as logger from "firebase-functions/logger";
-import { HttpsError, onCall, CallableRequest } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
@@ -19,9 +19,9 @@ interface DisplayUser {
   lastSignInTime: string;
 }
 
-// Type guard to ensure a value is a UserRole
-function isValidRole(role: unknown): role is UserRole {
-  return ["admin", "manager", "tenant", "none", null].includes(role as UserRole);
+// Type guard
+function isValidRole(r: unknown): r is UserRole {
+  return ["admin", "manager", "tenant", "none", null].includes(r as UserRole);
 }
 
 // --- Callable Data Interfaces ---
@@ -29,35 +29,31 @@ interface SetUserRoleData {
   uid: string;
   role: Exclude<UserRole, null>;
 }
-
 interface UserListUserData {
   filter?: string;
 }
 
-// --- setUserRole Callable (v2) ---
-export const setUserRole = onCall(
-  async (request: CallableRequest<SetUserRoleData>) => {
+// --- setUserRole (v2 callable) ---
+export const setUserRole = onCall<SetUserRoleData>(
+  async (request) => {
+    // must be logged in
     if (!request.auth) {
-      throw new HttpsError(
-        "unauthenticated",
-        "The function must be called while authenticated."
-      );
+      throw new HttpsError("unauthenticated", "Must be logged in.");
     }
-
     const { uid, role } = request.data;
     if (!uid || !role) {
-      throw new HttpsError("invalid-argument", "Both uid and role must be provided.");
+      throw new HttpsError("invalid-argument", "Both uid and role are required.");
     }
 
-    const isRequesterAdmin = request.auth.token.admin === true;
-    if (!isRequesterAdmin) {
-      const userToModify = await admin.auth().getUser(uid);
-      const isBootstrapSelfPromotion =
-        userToModify.email === "admin@example.com" &&
+    const isAdmin = request.auth.token.admin === true;
+    if (!isAdmin) {
+      // bootstrap case: user setting themselves admin
+      const userToMod = await admin.auth().getUser(uid);
+      const isBootstrap =
+        userToMod.email === "admin@example.com" &&
         role === "admin" &&
         request.auth.uid === uid;
-
-      if (!isBootstrapSelfPromotion) {
+      if (!isBootstrap) {
         throw new HttpsError("permission-denied", "Only admins can assign roles.");
       }
     }
@@ -66,75 +62,68 @@ export const setUserRole = onCall(
     if (!validRoles.includes(role)) {
       throw new HttpsError(
         "invalid-argument",
-        `Invalid role: ${role}. Must be one of ${validRoles.join(", ")}.`
+        `Role must be one of ${validRoles.join(", ")}.`
       );
     }
 
     try {
-      await admin.auth().setCustomUserClaims(uid, {
-        role,
-        admin: role === "admin",
-      });
-      logger.info(`Role '${role}' set for user ${uid} by ${request.auth.uid}`);
-      return { message: `Role '${role}' has been set for user ${uid}` };
-    } catch (error) {
-      logger.error(`Error setting role for user ${uid}:`, error);
-      const msg = error instanceof Error ? error.message : "unknown error";
-      throw new HttpsError("internal", `Failed to set user role: ${msg}`);
+      await admin
+        .auth()
+        .setCustomUserClaims(uid, { role, admin: role === "admin" });
+      logger.info(`Role '${role}' set for ${uid} by ${request.auth.uid}`);
+      return { message: `Role '${role}' set for user ${uid}` };
+    } catch (e) {
+      logger.error(`Failed to set role for ${uid}:`, e);
+      const msg = e instanceof Error ? e.message : "unknown";
+      throw new HttpsError("internal", `Could not set role: ${msg}`);
     }
   }
 );
 
-// --- assignDefaultRole Trigger (v1) ---
-export const assignDefaultRole = functionsV1.auth.user().onCreate(async (user) => {
-  try {
-    await admin.auth().setCustomUserClaims(user.uid, {
-      role: "tenant",
-      admin: false,
-    });
-    logger.info(`Assigned default 'tenant' role to new user: ${user.uid}`);
-  } catch (error) {
-    logger.error(`Error assigning default role to user ${user.uid}:`, error);
-  }
+// --- assignDefaultRole (v2 auth trigger) ---
+export const assignDefaultRole = onUserCreated((event) => {
+  const user = event.data;
+  admin
+    .auth()
+    .setCustomUserClaims(user.uid, { role: "tenant", admin: false })
+    .then(() =>
+      logger.info(`Default 'tenant' claim set for new user ${user.uid}`)
+    )
+    .catch((e) => logger.error(`Could not set default role:`, e));
 });
 
-// --- listUsersWithRoles Callable (v2) ---
-export const listUsersWithRoles = onCall(
-  async (request: CallableRequest<UserListUserData>) => {
+// --- listUsersWithRoles (v2 callable) ---
+export const listUsersWithRoles = onCall<UserListUserData>(
+  async (request) => {
     if (request.auth?.token.admin !== true) {
-      throw new HttpsError("permission-denied", "Only admins can list users.");
+      throw new HttpsError("permission-denied", "Only admins may list users.");
     }
 
-    const listAllUsers = async (
-      nextPageToken?: string,
-      users: DisplayUser[] = []
+    const recurse = async (
+      nextPage?: string,
+      acc: DisplayUser[] = []
     ): Promise<DisplayUser[]> => {
-      const result = await admin.auth().listUsers(1000, nextPageToken);
-      const batch = result.users.map((u) => {
-        const roleClaim = u.customClaims?.role;
-        return {
-          uid: u.uid,
-          email: u.email,
-          displayName: u.displayName,
-          role: isValidRole(roleClaim) ? roleClaim : "none",
-          disabled: u.disabled,
-          creationTime: u.metadata.creationTime,
-          lastSignInTime: u.metadata.lastSignInTime,
-        };
-      });
-      users.push(...batch);
-      return result.pageToken
-        ? listAllUsers(result.pageToken, users)
-        : users;
+      const res = await admin.auth().listUsers(1000, nextPage);
+      const batch = res.users.map((u) => ({
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        role: isValidRole(u.customClaims?.role) ? u.customClaims?.role : "none",
+        disabled: u.disabled,
+        creationTime: u.metadata.creationTime,
+        lastSignInTime: u.metadata.lastSignInTime,
+      }));
+      acc.push(...batch);
+      return res.pageToken ? recurse(res.pageToken, acc) : acc;
     };
 
     try {
-      const allUsers = await listAllUsers();
-      return { users: allUsers };
-    } catch (error) {
-      logger.error("Error listing users:", error);
-      const msg = error instanceof Error ? error.message : "unknown error";
-      throw new HttpsError("internal", `Failed to list users: ${msg}`);
+      const users = await recurse();
+      return { users };
+    } catch (e) {
+      logger.error("Error listing users:", e);
+      const msg = e instanceof Error ? e.message : "unknown";
+      throw new HttpsError("internal", `Could not list users: ${msg}`);
     }
   }
 );
