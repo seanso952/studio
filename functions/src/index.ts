@@ -1,13 +1,12 @@
 
-import * as functionsV1 from "firebase-functions/v1"; // Explicitly import v1 for v1 features
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import * as logger from "firebase-functions/logger"; // Correct logger import for v2
+import * as logger from "firebase-functions/logger";
 import {HttpsError, onCall, CallableRequest} from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
 // --- Type definitions, kept in sync with client-side src/lib/types.ts ---
-// This avoids a direct dependency on client code, which is good practice for functions.
 type UserRole = 'admin' | 'manager' | 'tenant' | 'none' | null;
 
 interface DisplayUser {
@@ -21,29 +20,24 @@ interface DisplayUser {
 }
 
 // Type guard to check if a value is a valid UserRole.
-function isValidRole(role: any): role is UserRole {
-  return ['admin', 'manager', 'tenant', 'none', null].includes(role);
+function isValidRole(role: unknown): role is UserRole {
+  return ['admin', 'manager', 'tenant', 'none', null].includes(role as UserRole);
 }
-
 
 // Define interfaces for callable function data
 interface SetUserRoleData {
   uid: string;
-  role: Exclude<UserRole, null>; // Role cannot be set to null via this function
+  role: Exclude<UserRole, null>;
 }
 
 interface UserListUserData {
-  // No specific data expected from client for listing users,
-  // but adding an optional field to avoid empty interface lint error.
   filter?: string;
 }
 
-// Callable function to set a user's role (e.g., 'admin', 'manager', etc.) - v2
+// Callable function to set a user's role - v2
 export const setUserRole = onCall(
   async (request: CallableRequest<SetUserRoleData>) => {
-    // onCall implicitly checks for authentication. If !request.auth, it throws 'unauthenticated'.
     if (!request.auth) {
-        // This is a defensive check; onCall should handle this.
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
@@ -58,8 +52,6 @@ export const setUserRole = onCall(
     // --- Refactored Security Check ---
     const isRequesterAdmin = request.auth.token.admin === true;
     
-    // If the requester is an admin, they are authorized.
-    // If not, we check for the special bootstrap case.
     if (!isRequesterAdmin) {
         const userToModify = await admin.auth().getUser(uid);
         const isBootstrapSelfPromotion = 
@@ -67,13 +59,11 @@ export const setUserRole = onCall(
             role === 'admin' &&
             request.auth.uid === uid;
         
-        // If not an admin AND not the valid bootstrap case, deny permission.
         if (!isBootstrapSelfPromotion) {
             throw new HttpsError( "permission-denied", "Only admins can assign roles." );
         }
     }
     
-    // --- Main Logic (authorized to proceed) ---
     const validRoles: Exclude<UserRole, null>[] = ["admin", "manager", "tenant", "none"];
     if (!validRoles.includes(role)) {
       throw new HttpsError(
@@ -83,7 +73,6 @@ export const setUserRole = onCall(
     }
 
     try {
-      // Set both 'role' and 'admin' claims for consistency
       await admin.auth().setCustomUserClaims(uid, { role, admin: role === 'admin' });
       logger.info(
         `Role '${role}' set for user ${uid} by requester ${request.auth.uid}`
@@ -105,14 +94,13 @@ export const setUserRole = onCall(
 
 // Automatically assign a 'tenant' role to every new user - V1 Auth Trigger
 export const assignDefaultRole = functionsV1.auth.user().onCreate(async (user: admin.auth.UserRecord) => {
-  // 'user' is the UserRecord from firebase-admin/auth
   try {
     await admin.auth().setCustomUserClaims(user.uid, {role: "tenant", admin: false});
-    functionsV1.logger.info( // Use logger from the v1 functionsV1 import
+    logger.info(
       `Assigned default 'tenant' role to new user: ${user.uid}`
     );
   } catch (error) {
-    functionsV1.logger.error( // Use logger from the v1 functionsV1 import
+    logger.error(
       `Error assigning default role to user ${user.uid}:`, error
     );
   }
@@ -121,7 +109,6 @@ export const assignDefaultRole = functionsV1.auth.user().onCreate(async (user: a
 // Callable function to list all users with their roles - v2
 export const listUsersWithRoles = onCall(
   async (request: CallableRequest<UserListUserData>) => {
-    // Security: only allow admins
     if (request.auth?.token.admin !== true) {
       throw new HttpsError(
         "permission-denied",
@@ -160,7 +147,7 @@ export const listUsersWithRoles = onCall(
       const allUsers = await listAllUsersRecursively();
       return {users: allUsers};
     } catch (error) {
-      logger.error("Error listing users:", error); // Using logger from the v2 'logger' import
+      logger.error("Error listing users:", error);
       if (error instanceof Error) {
         throw new HttpsError(
           "internal", `Failed to list users: ${error.message}`
