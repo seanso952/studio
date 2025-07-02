@@ -25,17 +25,11 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
 
       let determinedRole: UserRole = (claims.role as UserRole) || null;
 
-      // Temporary override for initial admin setup
-      if (firebaseUserFromListener.email === 'admin@example.com' && determinedRole !== 'admin') {
-        console.warn("authStore: Applying temporary client-side 'admin' role for admin@example.com to facilitate initial setup. Please use the User Management page to permanently set this role via the Firebase Function.");
-        determinedRole = 'admin';
-      }
-
       currentUser = {
         uid: firebaseUserFromListener.uid,
         name: (claims.name as string) || firebaseUserFromListener.displayName || firebaseUserFromListener.email,
         email: firebaseUserFromListener.email,
-        role: determinedRole,
+        role: (claims.admin === true ? 'admin' : determinedRole) as UserRole,
         assignedBuildingIds: (claims.assignedBuildingIds as string[]) || undefined,
         firebaseUser: firebaseUserFromListener,
       };
@@ -44,12 +38,7 @@ const updateUserState = async (firebaseUserFromListener: FirebaseUser | null) =>
     } catch (error) {
       console.error("authStore: Error fetching ID token result or processing claims:", error);
       let fallbackRole: UserRole = null;
-      // Apply temporary override even if claims fail for the bootstrap admin
-      if (firebaseUserFromListener.email === 'admin@example.com') {
-        console.warn("authStore: Claims fetch failed, applying temporary client-side 'admin' role for admin@example.com.");
-        fallbackRole = 'admin';
-      }
-
+      
       currentUser = {
         uid: firebaseUserFromListener.uid,
         name: firebaseUserFromListener.displayName || firebaseUserFromListener.email,
@@ -157,14 +146,23 @@ export const requestRoleUpdate = async (targetUid: string, newRole: UserRole): P
     return { success: false, message: "Firebase Functions service is not available." };
   }
   try {
+    // Force a token refresh *before* the call to ensure the backend receives the latest auth context.
+    // This is especially important for the bootstrap admin scenario right after login.
+    if (auth?.currentUser) {
+        console.log('authStore: Forcing token refresh before making function call...');
+        await getIdTokenResult(auth.currentUser, true);
+    }
+
     const setUserRoleFunction: HttpsCallable<SetUserRoleData, SetUserRoleResponse> = httpsCallable(functions, 'setUserRole');
     const result = await setUserRoleFunction({ uid: targetUid, role: newRole });
     console.log('authStore.requestRoleUpdate: setUserRole function call successful:', result.data.message);
-    // After successful role update, if the updated user is the current user,
-    // their ID token needs to be refreshed to reflect the new claim client-side immediately.
+
+    // After a successful role update, if the updated user is the current user,
+    // their ID token needs to be refreshed *again* to get the new custom claims client-side.
     if (auth?.currentUser && auth.currentUser.uid === targetUid) {
-      await getIdTokenResult(auth.currentUser, true); // Force refresh
-      updateUserState(auth.currentUser); // Re-process claims
+      console.log('authStore: Re-fetching token to get new custom claims...');
+      await getIdTokenResult(auth.currentUser, true); // Force refresh to get new claims
+      updateUserState(auth.currentUser); // Re-process claims with the updated token
     }
     return { success: true, message: result.data.message };
   } catch (error) {
