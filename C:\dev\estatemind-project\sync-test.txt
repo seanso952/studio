@@ -1,1 +1,0 @@
-This is a test file for the C:\dev\estatemind-project directory. If you are seeing this, the file synchronization is now working correctly. Test 4.
