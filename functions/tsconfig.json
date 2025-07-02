@@ -10,15 +10,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": false,
     "baseUrl": "./",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules"
-    ],
     "noImplicitReturns": true,
-    "noUnusedLocals": false,
-    "traceResolution": true
+    "noUnusedLocals": false
   },
   "include": [
     "src/**/*.ts"
