@@ -75,7 +75,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         setAppUserLocal(initialUser);
         setAuthLoading(false);
     } else {
-        // This helps resolve the initial loading state faster if auth is already known to be null
         const authLib = require('@/lib/firebaseConfig').auth;
         if(authLib && authLib.currentUser === null){
             setAuthLoading(false);
