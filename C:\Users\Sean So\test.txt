@@ -1,1 +1,0 @@
-This is the second attempt to create this test file. If you see this, the write operation was successful this time.
