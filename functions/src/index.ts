@@ -68,7 +68,7 @@ export const setUserRole = onCall(
     }
 
     try {
-      await admin.auth().setCustomUserClaims(uid, {role});
+      await admin.auth().setCustomUserClaims(uid, { role, admin: role === 'admin' });
       functions.logger.info( // Using logger from the v2 'functions' import
         `Role '${role}' set for user ${uid} by admin ${request.auth?.uid}`
       );
@@ -91,7 +91,7 @@ export const setUserRole = onCall(
 export const assignDefaultRole = functionsV1.auth.user().onCreate(async (user: admin.auth.UserRecord) => {
   // 'user' is the UserRecord from firebase-admin/auth
   try {
-    await admin.auth().setCustomUserClaims(user.uid, {role: "tenant"});
+    await admin.auth().setCustomUserClaims(user.uid, {role: "tenant", admin: false});
     functionsV1.logger.info( // Use logger from the v1 functionsV1 import
       `Assigned default 'tenant' role to new user: ${user.uid}`
     );
