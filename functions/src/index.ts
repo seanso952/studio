@@ -34,20 +34,28 @@ interface ListedUser {
 // Callable function to set a user's role (e.g., 'admin', 'manager', etc.) - v2
 export const setUserRole = onCall(
   async (request: CallableRequest<SetUserRoleData>) => {
-    // Security: only allow admins to call this
-    if (request.auth?.token.admin !== true) {
-      throw new HttpsError(
-        "permission-denied",
-        "Only admins can assign roles."
-      );
-    }
-
     const {uid, role} = request.data;
 
     if (!uid || !role) {
       throw new HttpsError(
         "invalid-argument",
         "Both uid and role must be provided."
+      );
+    }
+    
+    // --- Bootstrap Logic ---
+    // Fetch the user record for the user whose role is being changed.
+    const userToModify = await admin.auth().getUser(uid);
+    // This condition allows 'admin@example.com' to have their own role set to 'admin'
+    // without the requester needing to be an admin already. This is the bootstrap mechanism.
+    const isBootstrapAdminSelfPromotion = userToModify.email === 'admin@example.com' && role === 'admin' && request.auth?.uid === uid;
+
+    // Security check:
+    // Requester must be an admin, UNLESS it's the bootstrap case.
+    if (!isBootstrapAdminSelfPromotion && request.auth?.token.admin !== true) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only admins can assign roles."
       );
     }
 
